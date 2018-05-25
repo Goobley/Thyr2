@@ -286,7 +286,7 @@ local function visualise_dipole_param(d, scale, gyroParams, paramName, interp_fn
         -- Use ANSI escape code. Don't be fooled by the \033 you see in C examples, C
         -- takes these escaped characters in octal, lua is in decimal 33octal = 27dec
         io.write('\027[A\027[K')
-        io.write("Optimisitic: ", arghDex, "/", p.count * scale^3, "\n")
+        io.write("Approximate: ", arghDex, "/", p.count * scale^3, "\n")
         -- for eta = aabb.y.min, aabb.y.max, step do
         for y = d.aabb.y.min - d.trans.y, d.aabb.y.max - d.trans.y, step do
             for zetaIdx = d.aabb.z.min - d.trans.z, d.aabb.z.max - d.trans.z, step do
@@ -442,7 +442,7 @@ local function dipole_in_aabb(d, scale, gyroParams, interp_fn)
     -- for xiIdx = aabb.x.min, aabb.x.max, step do
     for x = d.aabb.x.min - d.trans.x, d.aabb.x.max - d.trans.x, step do
         io.write('\027[A\027[K')
-        io.write("Optimisitic: ", arghDex, "/", p.count * scale^3, "\n")
+        io.write("Approximate: ", arghDex, "/", p.count * scale^3, "\n")
         -- for eta = aabb.y.min, aabb.y.max, step do
         for y = d.aabb.y.min - d.trans.y, d.aabb.y.max - d.trans.y, step do
             for zetaIdx = d.aabb.z.min - d.trans.z, d.aabb.z.max - d.trans.z, step do

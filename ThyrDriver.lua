@@ -211,7 +211,7 @@ function main()
         -- Perform gyro simulation
         local grid3HD = Thyr.dipole_in_aabb(dipoleData, scale, gyroParams, interp_fn)
         print('Making High-Res Footpoints: ', os.time() - startTime)
-        local highResRegions = Thyr.create_high_res_footpoints(dipoleData, gyroParams, 1, 0.25, interp_fn)
+        local highResRegions = Thyr.create_high_res_footpoints(dipoleData, gyroParams, 6, 0.25, interp_fn)
 
         if false then
             -- This code shows how to serialise the simulation data to disk and load it again
