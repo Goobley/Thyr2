@@ -30,6 +30,7 @@
 <h2>Contents</h2>
 <ul>
 <li><a href="#Tables">Tables</a></li>
+<li><a href="#Local_Functions">Local Functions</a></li>
 </ul>
 
 
@@ -63,6 +64,101 @@
 	<tr>
 	<td class="name" nowrap><a href="#exports">exports</a></td>
 	<td class="summary"></td>
+	</tr>
+</table>
+<h2><a href="#Local_Functions">Local Functions</a></h2>
+<table class="function_list">
+	<tr>
+	<td class="name" nowrap><a href="#allocate_grid">allocate_grid (xSize, ySize, zSize)</a></td>
+	<td class="summary">Allocates the 3D Voxel Grid to hold j and k.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#DoubleCArray">DoubleCArray (len)</a></td>
+	<td class="summary">GC'd array of Doubles.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#uniform_3d_index_gen">uniform_3d_index_gen (numVox)</a></td>
+	<td class="summary">Generator to index a uniform 3D grid from x, y, and z.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#non_uniform_3d_index_gen">non_uniform_3d_index_gen (xVox, yVox, zVox)</a></td>
+	<td class="summary">Generator to index a 3D grid from x, y, and z.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#uniform_2d_index_gen">uniform_2d_index_gen (len)</a></td>
+	<td class="summary">Generator to index a 2D grid from x and y.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#aabb_to_grid_alloc_size">aabb_to_grid_alloc_size (aabb, scale)</a></td>
+	<td class="summary">Computes size to allocate from an AABB object and a scale factor.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#aabb_to_index">aabb_to_index (aabb, scale)</a></td>
+	<td class="summary">Index function from an AABB object and a scale factor.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#backup_grid">backup_grid (grid, gyroParams, filename)</a></td>
+	<td class="summary">Serialise grid to file.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#restore_backup_grid">restore_backup_grid (filename)</a></td>
+	<td class="summary">Load grid from file.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#dipole">dipole (d[, trans])</a></td>
+	<td class="summary">Generate a dipole shape with the given parameters.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#visualise_dipole_param">visualise_dipole_param (d, scale, gyroParams, paramName, interp_fn)</a></td>
+	<td class="summary">Fill the dipole shape with the value of the requested parameter.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#dipole_in_aabb">dipole_in_aabb (d, scale, gyroParams, interp_fn)</a></td>
+	<td class="summary">Construct a dipole with j and k in the AABB.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#create_high_res_footpoints">create_high_res_footpoints (d, gyroParams, scale, footpointFraction, interp_fn)</a></td>
+	<td class="summary">Refine the Grid around the dipole's footpoints.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#min_per_elem">min_per_elem (vec1, vec2)</a></td>
+	<td class="summary">Returns the minimum of each element of two maf.vec3's.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#max_per_elem">max_per_elem (vec1, vec2)</a></td>
+	<td class="summary">Returns the maximum of each element of two maf.vec3's.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#min_elem">min_elem (vec)</a></td>
+	<td class="summary">Returns the minimum element of a maf.vec3.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#max_elem">max_elem (vec)</a></td>
+	<td class="summary">Returns the maximum element of a maf.vec3.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#box_ray_intersections">box_ray_intersections (box, rayOrigin, rayDirection)</a></td>
+	<td class="summary">Compute the intersections of a ray and a box.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#average_path_trace">average_path_trace (lowRes, highRes, resolution, gyroParams)</a></td>
+	<td class="summary">Raymarch through the provided regions and return the average value for each ray.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#path_trace">path_trace (lowRes, highRes, resolution, gyroParams)</a></td>
+	<td class="summary">Raymarch through the provided regions and return the integrated brightness temperature values in O and X modes and thermal emission for each ray.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#rotation_zyx">rotation_zyx (x, y, z)</a></td>
+	<td class="summary">Returns the rotation quaternion for a rotation about the z, then y, then x axes.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#solar_location">solar_location (tilt, azimuth, latitude, longitude)</a></td>
+	<td class="summary">Returns the rotation quaternion for a given location on the Sun.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#ray_direction">ray_direction (rotMat)</a></td>
+	<td class="summary">Returns the ray direction for a given rotation.</td>
 	</tr>
 </table>
 
@@ -148,13 +244,776 @@
 
 </dd>
 </dl>
+    <h2 class="section-header "><a name="Local_Functions"></a>Local Functions</h2>
+
+    <dl class="function">
+    <dt>
+    <a name = "allocate_grid"></a>
+    <strong>allocate_grid (xSize, ySize, zSize)</strong>
+    </dt>
+    <dd>
+    Allocates the 3D Voxel Grid to hold j and k.
+ Wrapper around the C functions that allocate the grid holding the
+ emission/absorption parameters, so that grids are automatically garbage
+ collected when there are no remaining references.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">xSize</span>
+            <span class="types"><span class="type">int</span></span>
+         Number of x voxels
+        </li>
+        <li><span class="parameter">ySize</span>
+            <span class="types"><span class="type">int</span></span>
+         Number of y voxels
+        </li>
+        <li><span class="parameter">zSize</span>
+            <span class="types"><span class="type">int</span></span>
+         Number of z voxels
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+        Garbage collected grid
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "DoubleCArray"></a>
+    <strong>DoubleCArray (len)</strong>
+    </dt>
+    <dd>
+    GC'd array of Doubles.
+ Lua "type" for a simple garbage collected array of doubles. _Much_ smaller
+ than using a table.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">len</span>
+            <span class="types"><span class="type">int</span></span>
+         length of array (0-indexed as it comes from C)
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "uniform_3d_index_gen"></a>
+    <strong>uniform_3d_index_gen (numVox)</strong>
+    </dt>
+    <dd>
+    Generator to index a uniform 3D grid from x, y, and z.
+ The grids are one-dimensional for speed reasons, this hides that fact.
+ Also does some error chacking to avoid segfaults.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">numVox</span>
+            <span class="types"><span class="type">int</span></span>
+         grid side length
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+        function (x, y, z) -> index for use with uniform 3D grid
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "non_uniform_3d_index_gen"></a>
+    <strong>non_uniform_3d_index_gen (xVox, yVox, zVox)</strong>
+    </dt>
+    <dd>
+    Generator to index a 3D grid from x, y, and z.
+ The grids are one-dimensional for speed reasons, this hides that fact.
+ In this version x, y and z can have different lengths.
+ Also does some error chacking to avoid segfaults.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">xVox</span>
+            <span class="types"><span class="type">int</span></span>
+         grid x length
+        </li>
+        <li><span class="parameter">yVox</span>
+            <span class="types"><span class="type">int</span></span>
+         grid y length
+        </li>
+        <li><span class="parameter">zVox</span>
+            <span class="types"><span class="type">int</span></span>
+         grid z length
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+        function (x, y, z) -> index for use with 3D grid
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "uniform_2d_index_gen"></a>
+    <strong>uniform_2d_index_gen (len)</strong>
+    </dt>
+    <dd>
+    Generator to index a 2D grid from x and y.
+ The grids are one-dimensional for speed reasons, this hides that fact.
+ This is used for things like images, (assumed to be square in Thyr).
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">len</span>
+            <span class="types"><span class="type">int</span></span>
+         grid side length
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+        function (x, y) -> index for use with uniform 2D grid
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "aabb_to_grid_alloc_size"></a>
+    <strong>aabb_to_grid_alloc_size (aabb, scale)</strong>
+    </dt>
+    <dd>
+    Computes size to allocate from an AABB object and a scale factor.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">aabb</span>
+            <span class="types"><a class="type" href="index.html#AABB">AABB</a></span>
+         an axis-aligned bounding box object (see later)
+        </li>
+        <li><span class="parameter">scale</span>
+            <span class="types"><span class="type">int</span></span>
+         the scale factor by which the linear grid density is scaled
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+        number of voxels to allocate
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "aabb_to_index"></a>
+    <strong>aabb_to_index (aabb, scale)</strong>
+    </dt>
+    <dd>
+    Index function from an AABB object and a scale factor.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">aabb</span>
+            <span class="types"><a class="type" href="index.html#AABB">AABB</a></span>
+         an axis-aligned bounding box object (see later)
+        </li>
+        <li><span class="parameter">scale</span>
+            <span class="types"><span class="type">int</span></span>
+         the scale factor by which the linear grid density is scaled
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+        Index function for this grid
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "backup_grid"></a>
+    <strong>backup_grid (grid, gyroParams, filename)</strong>
+    </dt>
+    <dd>
+    Serialise grid to file.
+ This saves two files determined by the filename prefix
+ These can be restored using <a href="index.html#restore_backup_grid">restore_backup_grid</a>
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">grid</span>
+            <span class="types"><span class="type">Grid</span></span>
+         the grid object generated by <a href="index.html#dipole_in_aabb">dipole_in_aabb</a>
+        </li>
+        <li><span class="parameter">gyroParams</span>
+            <span class="types"><span class="type">GyroDataTable</span></span>
+         the shared data required for Gyro calculations
+        </li>
+        <li><span class="parameter">filename</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
+         a filename prefix, '_grid.bak' and '_meta.bak' will be appended for the files that are saved
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "restore_backup_grid"></a>
+    <strong>restore_backup_grid (filename)</strong>
+    </dt>
+    <dd>
+    Load grid from file.
+ Loads the two files determined by the filename prefix
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">filename</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
+         a filename prefix, '_grid.bak' and '_meta.bak' will be appended to load the files as per <a href="index.html#backup_grid">backup_grid</a>
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+        <li>
+           <span class="types"><span class="type">Grid</span></span>
+        loaded grid</li>
+        <li>
+           <span class="types"><span class="type">GyroParamTable</span></span>
+        the shared data required for Gyro calculations</li>
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "dipole"></a>
+    <strong>dipole (d[, trans])</strong>
+    </dt>
+    <dd>
+    Generate a dipole shape with the given parameters.
+ This shape is stored in an array of bytes with a 1 signaling that the voxel
+ is inside the dipole shape
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">d</span>
+            <span class="types"><span class="type">DipoleParams</span></span>
+         parameters determining shape of Dipole. See Driver function for form
+        </li>
+        <li><span class="parameter">trans</span>
+            <span class="types"><span class="type">maf.vec3</span></span>
+         translation of dipole inside grid
+         (<em>optional</em>)
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+        <li>
+           <span class="types"><span class="type">ByteArray</span></span>
+        Grid of data describing dipole</li>
+        <li>
+           <span class="types"><span class="type">IndexFn</span></span>
+        Function to use for indexing the ByteArray</li>
+        <li>
+           <span class="types"><a class="type" href="index.html#AABB">AABB</a></span>
+        AABB for dipole contained in array</li>
+        <li>
+           <span class="types"><span class="type">int</span></span>
+        Number of voxels that are inside the dipole</li>
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "visualise_dipole_param"></a>
+    <strong>visualise_dipole_param (d, scale, gyroParams, paramName, interp_fn)</strong>
+    </dt>
+    <dd>
+    Fill the dipole shape with the value of the requested parameter.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">d</span>
+            <span class="types"><span class="type">Grid</span></span>
+         table containing the dipole shape and the parameters
+        </li>
+        <li><span class="parameter">scale</span>
+            <span class="types"><span class="type">int</span></span>
+         the scale factor by which to increase the linear grid density
+        </li>
+        <li><span class="parameter">gyroParams</span>
+            <span class="types"><span class="type">GyroParamTable</span></span>
+         shared parameters used in Gyro calculations
+        </li>
+        <li><span class="parameter">paramName</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
+         parameter name to fill the grid with. One of 'angle', 'height', 'N_el', 'N_p', 'B_mag', 'temperature', 'N_HI', 'N_HII'
+        </li>
+        <li><span class="parameter">interp_fn</span>
+            <span class="types"><span class="type">function(height)->PlasmaParams</span></span>
+         function returning, for a given height, the values of N_el, N_p, temperature, N_HI, N_HII
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+           <span class="types"><span class="type">Grid</span></span>
+        a complete grid structure with the filled parameter
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "dipole_in_aabb"></a>
+    <strong>dipole_in_aabb (d, scale, gyroParams, interp_fn)</strong>
+    </dt>
+    <dd>
+    Construct a dipole with j and k in the AABB.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">d</span>
+            <span class="types"><span class="type">Grid</span></span>
+         the Grid returned from <a href="index.html#dipole">dipole</a>
+        </li>
+        <li><span class="parameter">scale</span>
+            <span class="types"><span class="type">int</span></span>
+         the scale factor to apply
+        </li>
+        <li><span class="parameter">gyroParams</span>
+            <span class="types"><span class="type">GyroParamTable</span></span>
+         the shared parameters for the Gyro calculation
+        </li>
+        <li><span class="parameter">interp_fn</span>
+            <span class="types"><span class="type">function(height)->PlasmaParams</span></span>
+         function returning, for a given height, the values of N_el, N_p, temperature, N_HI, N_HII
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+           <span class="types"><span class="type">Grid</span></span>
+        a complete grid structure with the filled j and k values for each requested frequency for each voxel within the dipole, these are null pointers elsewhere
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "create_high_res_footpoints"></a>
+    <strong>create_high_res_footpoints (d, gyroParams, scale, footpointFraction, interp_fn)</strong>
+    </dt>
+    <dd>
+    Refine the Grid around the dipole's footpoints.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">d</span>
+            <span class="types"><span class="type">Grid</span></span>
+         Grid returned from <a href="index.html#dipole">dipole</a>
+        </li>
+        <li><span class="parameter">gyroParams</span>
+            <span class="types"><span class="type">GyroParamTable</span></span>
+         the shared parameters for the Gyro calculation
+        </li>
+        <li><span class="parameter">scale</span>
+            <span class="types"><span class="type">int</span></span>
+         the scale factor to apply
+        </li>
+        <li><span class="parameter">footpointFraction</span>
+            <span class="types"><span class="type">number</span></span>
+         fraction of the y length of the AABB taken up by the footpoints
+        </li>
+        <li><span class="parameter">interp_fn</span>
+            <span class="types"><span class="type">function(height)->PlasmaParams</span></span>
+         function returning, for a given height, the values of N_el, N_p, temperature, N_HI, N_HII
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+           <span class="types"><span class="type">List{Grid}</span></span>
+        a List containing the two refined Grids shrunk around the footpoints with their computed parameters inside
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "min_per_elem"></a>
+    <strong>min_per_elem (vec1, vec2)</strong>
+    </dt>
+    <dd>
+    Returns the minimum of each element of two maf.vec3's.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">vec1</span>
+
+        </li>
+        <li><span class="parameter">vec2</span>
+
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "max_per_elem"></a>
+    <strong>max_per_elem (vec1, vec2)</strong>
+    </dt>
+    <dd>
+    Returns the maximum of each element of two maf.vec3's.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">vec1</span>
+
+        </li>
+        <li><span class="parameter">vec2</span>
+
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "min_elem"></a>
+    <strong>min_elem (vec)</strong>
+    </dt>
+    <dd>
+    Returns the minimum element of a maf.vec3.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">vec</span>
+
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "max_elem"></a>
+    <strong>max_elem (vec)</strong>
+    </dt>
+    <dd>
+    Returns the maximum element of a maf.vec3.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">vec</span>
+
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "box_ray_intersections"></a>
+    <strong>box_ray_intersections (box, rayOrigin, rayDirection)</strong>
+    </dt>
+    <dd>
+    Compute the intersections of a ray and a box.
+ Based on Slab method presented in Siggraph 1998 by S. Owen. Added Tavian
+ Barnes' improvements using the IEE754 standard to handle edge cases that must
+ otherwise be handled explicitly. Minor improvements in the number of
+ comparisons with infinity.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">box</span>
+            <span class="types"><a class="type" href="index.html#AABB">AABB</a></span>
+         the AABB enclosing the region of interest
+        </li>
+        <li><span class="parameter">rayOrigin</span>
+            <span class="types"><span class="type">maf.vec3</span></span>
+         the origin of the ray
+        </li>
+        <li><span class="parameter">rayDirection</span>
+            <span class="types"><span class="type">maf.vec3</span></span>
+         the normalised direction vector of the ray
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+        <li>
+           <span class="types"><span class="type">number</span></span>
+        the first intersection t with the box such that rayOrigin + rayDirection * t = intersection</li>
+        <li>
+           <span class="types"><span class="type">number</span></span>
+        the second intersection with the box</li>
+        <li>
+           <span class="types"><span class="type">nil</span></span>
+        if the ray does not intersect with the box then nil is returned</li>
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "average_path_trace"></a>
+    <strong>average_path_trace (lowRes, highRes, resolution, gyroParams)</strong>
+    </dt>
+    <dd>
+    Raymarch through the provided regions and return the average value for each ray.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">lowRes</span>
+            <span class="types"><span class="type">Grid</span></span>
+         the basic unrefined grid valid everywhere in the dipole
+        </li>
+        <li><span class="parameter">highRes</span>
+            <span class="types"><span class="type">List{Grid}</span></span>
+         List of high resolution refined grids valid in certain locations (eg. footpoints). If none then provide an empty list.
+        </li>
+        <li><span class="parameter">resolution</span>
+            <span class="types"><span class="type">int</span></span>
+         the resolution of the image to trace
+        </li>
+        <li><span class="parameter">gyroParams</span>
+            <span class="types"><span class="type">GyroParamTable</span></span>
+         the shared parameters required for the Gyro calculation
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+        <li>
+           <span class="types"><a class="type" href="index.html#DoubleCArray">DoubleCArray</a></span>
+        the array containing the output image</li>
+        <li>
+           <span class="types"><span class="type">function(x,y)->index</span></span>
+        function used to index the array in x and y coordinates</li>
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "path_trace"></a>
+    <strong>path_trace (lowRes, highRes, resolution, gyroParams)</strong>
+    </dt>
+    <dd>
+    Raymarch through the provided regions and return the integrated brightness temperature values in O and X modes and thermal emission for each ray.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">lowRes</span>
+            <span class="types"><span class="type">Grid</span></span>
+         the basic unrefined grid valid everywhere in the dipole
+        </li>
+        <li><span class="parameter">highRes</span>
+            <span class="types"><span class="type">List{Grid}</span></span>
+         List of high resolution refined grids valid in certain locations (eg. footpoints). If none then provide an empty list.
+        </li>
+        <li><span class="parameter">resolution</span>
+            <span class="types"><span class="type">int</span></span>
+         the resolution of the image to trace
+        </li>
+        <li><span class="parameter">gyroParams</span>
+            <span class="types"><span class="type">GyroParamTable</span></span>
+         the shared parameters required for the Gyro calculation
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+        <li>
+           <span class="types"><a class="type" href="index.html#DoubleCArray">DoubleCArray</a></span>
+        the array containing the output image</li>
+        <li>
+           <span class="types"><span class="type">function(x,y)->index</span></span>
+        function used to index the array in x and y coordinates</li>
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "rotation_zyx"></a>
+    <strong>rotation_zyx (x, y, z)</strong>
+    </dt>
+    <dd>
+    Returns the rotation quaternion for a rotation about the z, then y, then x axes.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">x</span>
+            <span class="types"><span class="type">number</span></span>
+         the rotation to perform about the x axis in radians
+        </li>
+        <li><span class="parameter">y</span>
+            <span class="types"><span class="type">number</span></span>
+         the rotation to perform about the y axis in radians
+        </li>
+        <li><span class="parameter">z</span>
+            <span class="types"><span class="type">number</span></span>
+         the rotation to perform about the z axis in radians
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+           <span class="types"><span class="type">maf.quat</span></span>
+        the quaternion defining this rotation
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "solar_location"></a>
+    <strong>solar_location (tilt, azimuth, latitude, longitude)</strong>
+    </dt>
+    <dd>
+    Returns the rotation quaternion for a given location on the Sun.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">tilt</span>
+            <span class="types"><span class="type">number</span></span>
+         the "lean" of the flare away from the normal to the surface in degrees
+        </li>
+        <li><span class="parameter">azimuth</span>
+            <span class="types"><span class="type">number</span></span>
+         the rotation of the flare from the N-S axis in degrees
+        </li>
+        <li><span class="parameter">latitude</span>
+            <span class="types"><span class="type">number</span></span>
+         the solar location in degrees
+        </li>
+        <li><span class="parameter">longitude</span>
+            <span class="types"><span class="type">number</span></span>
+         the solar location in degrees
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+           <span class="types"><span class="type">maf.quat</span></span>
+        the quaternion defining the rotation for this location
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "ray_direction"></a>
+    <strong>ray_direction (rotMat)</strong>
+    </dt>
+    <dd>
+    Returns the ray direction for a given rotation.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">rotMat</span>
+            <span class="types"><span class="type">maf.quat</span></span>
+         the rotation to generate the direction vector for
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+           <span class="types"><span class="type">maf.vec3</span></span>
+        the normalised direction vector for this rotation
+    </ol>
+
+
+
+
+</dd>
+</dl>
 
 
 </div> <!-- id="content" -->
 </div> <!-- id="main" -->
 <div id="about">
 <i>generated by <a href="http://github.com/stevedonovan/LDoc">LDoc 1.4.6</a></i>
-<i style="float:right;">Last updated 2018-05-23 12:04:46 </i>
+<i style="float:right;">Last updated 2018-05-25 18:33:23 </i>
 </div> <!-- id="about" -->
 </div> <!-- id="container" -->
 </body>
