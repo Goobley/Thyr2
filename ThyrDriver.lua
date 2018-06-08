@@ -43,12 +43,18 @@ local function nel_stopping_array(atmosData)
     local eMax = energyLimits[2]
 
     atmosData.nel = {}
+    atmosData.minBeamEnergy = {}
+    atmosData.maxBeamEnergy = {}
+    atmosData.beamDelta = {}
     for i = 1,#atmosData.height do
         if atmosData.height[i] > maxChromoH then
             atmosData.nel[i] = coronaNel
         else
             atmosData.nel[i] = maxChromoNel
         end
+        atmosData.minBeamEnergy[i] = eMin
+        atmosData.maxBeamEnergy[i] = eMax
+        atmosData.beamDelta[i] = delta
     end
 
     local function create_log_space(eMin, eMax, numPts)
@@ -100,7 +106,7 @@ local function nel_stopping_array(atmosData)
             local deltaH = math.abs(atmosData.height[j-1] - atmosData.height[j])
             pt.columnDensity = pt.columnDensity + aveDensity * deltaH
             -- If the column density is above the stop density then input the stop height and move onto the next step
-            if pt.columnDensity >= 1e17 * pt.energy * pt.energy then
+            if pt.columnDensity >= 1e17 * pt.energy^2 then
                 pt.stopHeight = atmosData.height[j-1]
                 break
             end
@@ -108,13 +114,19 @@ local function nel_stopping_array(atmosData)
     end
 
     -- Reduce the electron density
-    for _,pt in ipairs(electrons) do
-        for hIndex,h in ipairs(atmosData.height) do
-            if h < pt.stopHeight then
-                atmosData.nel[hIndex] = atmosData.nel[hIndex] - pt.prob * maxChromoNel
+    for binIdx,bin in ipairs(electrons) do
+        for hIdx,h in ipairs(atmosData.height) do
+            if h < bin.stopHeight then
+                atmosData.nel[hIdx] = atmosData.nel[hIdx] - bin.prob * maxChromoNel
+                atmosData.minBeamEnergy[hIdx] = electrons[binIdx+1] and electrons[binIdx+1].energy or eMax
             end
         end
     end
+
+    for hIdx = 1, #atmosData.height do
+        if atmosData.minBeamEnergy[hIdx] >= 0.99*eMax then atmosData.minBeamEnergy[hIdx] = 0.99*eMax end
+    end
+
 end
 
 local function plot_atmos_data(atmosData, prefix)
@@ -144,7 +156,7 @@ local function plot_atmos_data(atmosData, prefix)
           :end_frame()
 end
 
-function main()
+function main(plotIdx)
     -- Initialise
     local startTime = os.time()
     Plyght:init()
@@ -155,6 +167,13 @@ function main()
     nel_stopping_array(atmosData)
     -- Produce a plot of the atmosphere if Plyght is running
     plot_atmos_data(atmosData, prefix)
+    -- Plyght:start_frame()
+    --       :plot()
+    --       :plot_type('semilogy')
+    --       :x_range(0, 5e8)
+    --       :line(atmosData.height, atmosData.minBeamEnergy)
+    --       :line(atmosData.height, atmosData.maxBeamEnergy)
+    --       :end_frame()
 
     -- Number of low-resolution voxels to be used per side of cube.
     local numVox = 32
@@ -186,7 +205,36 @@ function main()
     -- Scale factor for high res footpoints (scales voxel side length)
     local scale  = 1
     -- Create interpolation function for the atmospheric data
-    local interp_fn = function(height) return interpolate_data(height, atmosData) end
+    local interp_fn = function(height) 
+                            local modelData = interpolate_data(height, atmosData) 
+                            local h = atmosData.height
+                            for i = 2, #atmosData.height do
+                                if height > h[i-1] and height <= h[i] then
+                                    local lerp = LerpHeight(height, {atmosData.height[i-1], atmosData.height[i]})
+
+                                    modelData.nel = lerp({atmosData.nel[i-1], atmosData.nel[i]})
+                                    -- If you start modifying the max beam energy then that should be Lerp'd too
+                                    modelData.beamEnergyLimits = {lerp({atmosData.minBeamEnergy[i-1], atmosData.minBeamEnergy[i]}), atmosData.maxBeamEnergy[i]}
+                                    modelData.beamDelta = atmosData.beamDelta[i]
+
+                                    return modelData
+
+                                end
+                            end
+
+                            -- If it isn't then use an end value
+                            if height > h[#h] then
+                                modelData.nel = atmosData.nel[#h]
+                                modelData.beamEnergyLimits = {atmosData.minBeamEnergy[#h], atmosData.maxBeamEnergy[#h]}
+                                modelData.beamDelta = atmosData.beamDelta[#h]
+                            else
+                                modelData.nel = atmosData.nel[1]
+                                modelData.beamEnergyLimits = {atmosData.minBeamEnergy[1], atmosData.maxBeamEnergy[1]}
+                                modelData.beamDelta = atmosData.beamDelta[1]
+                            end
+
+                            return modelData
+                      end
     print('Making Accurate Dipole: ', os.time() - startTime)
     -- Create the rotation quaternion for the object (effectively just a fancy form of a rotation matrix)
     local rotMat = Thyr.solar_location(0, -20, 30, 70)
@@ -204,14 +252,15 @@ function main()
                         rotMat = rotMat,
                     }
     -- Parameters needed for the simulation of GS emission
-    local gyroParams = { frequency = {34e9}, energy = energyLimits, delta = delta }
+    local gyroParams = { frequency = {1e9, 10e9, 34e9, 70e9, 100e9}, energy = energyLimits, delta = delta }
     local plot
 
     if true then
         -- Perform gyro simulation
-        local grid3HD = Thyr.dipole_in_aabb(dipoleData, scale, gyroParams, interp_fn)
+        local pool = Thyr.create_gyro_thread_pool(12)
+        local grid3HD = Thyr.dipole_in_aabb(dipoleData, scale, gyroParams, interp_fn, pool)
         print('Making High-Res Footpoints: ', os.time() - startTime)
-        local highResRegions = Thyr.create_high_res_footpoints(dipoleData, gyroParams, 6, 0.25, interp_fn)
+        local highResRegions = Thyr.create_high_res_footpoints(dipoleData, gyroParams, 6, 0.25, interp_fn, pool)
 
         if false then
             -- This code shows how to serialise the simulation data to disk and load it again
@@ -233,6 +282,7 @@ function main()
                 :plot()
                 :colorbar()
                 :imshow(imageList[freqIdx][mode], resolution, resolution)
+                :print('fail'..plotIdx..'.png')
                 :end_frame()
         end
         plot('o', 1)
@@ -262,3 +312,8 @@ function main()
 end
 
 plot = main()
+-- for i = 1,20 do
+--     main(i)
+--     collectgarbage()
+--     collectgarbage()
+-- end

@@ -13,6 +13,10 @@ local copy = require('pl.tablex').copy
 local deepcopy = require('pl.tablex').deepcopy
 local Plyght = require('Plyght.Plyght')
 local maf = require('maf')
+local threads = require('threads')
+
+-- require 'jit'
+-- jit.off()
 
 -- Import C prototypes and ffi library
 local ffi = require('ffi')
@@ -33,6 +37,7 @@ local Gyro = ffi.load('./libgyro.so')
 -- Useful constants.
 local ArcToCm = math.pi / 180.0 / 3600.0 * 1.49597870e13
 local SolarRadiusCm = 960 * ArcToCm
+local MultiSampleFactor = 2
 math.inf = math.huge
 
 --- Allocates the 3D Voxel Grid to hold j and k.
@@ -52,7 +57,7 @@ end
 -- than using a table.
 -- @int len length of array (0-indexed as it comes from C)
 local function DoubleCArray(len)
-    return ffi.gc(ffi.cast(DoublePtr, ffi.C.calloc(len, ffi.sizeof(Double))), ffi.free)
+    return ffi.gc(ffi.cast(DoublePtr, ffi.C.calloc(len, ffi.sizeof(Double))), ffi.C.free)
 end
 
 --- Generator to index a uniform 3D grid from x, y, and z.
@@ -394,13 +399,37 @@ local function visualise_dipole_param(d, scale, gyroParams, paramName, interp_fn
         } 
 end
 
+--- Construct a thread pool to parallelise computation of the gyrosynchrotron coefficients
+-- @int number of threads to use
+-- @treturn threads.Threads Thread pool object used in torch with initialised threads
+local function create_gyro_thread_pool(numThreads)
+    return threads.Threads(numThreads,
+                    function()
+                        print('loaded'..__threadid)
+                        local ffi = require('ffi')
+                        C = {}
+                        ffi.cdef(defsStr)
+                        ffi.cdef[[
+                        void* calloc(size_t num, size_t size);
+                        void free(void* p);
+                        ]]
+                        C.GyroIn = ffi.typeof('GyroSimDataC')
+                        C.ThermalRadiationData = ffi.typeof('ThermalRadiationData')
+                        C.DoublePtr = ffi.typeof('f64*') 
+                        C.Double = ffi.typeof('f64') 
+                        C.Gyro = ffi.load('./libgyro.so')
+                        C.ffi = ffi
+                    end)
+end
+
 --- Construct a dipole with j and k in the AABB.
 -- @tparam Grid d the Grid returned from @{dipole}
 -- @int scale the scale factor to apply
 -- @tparam GyroParamTable gyroParams the shared parameters for the Gyro calculation
 -- @tparam function(height)->PlasmaParams interp_fn function returning, for a given height, the values of N_el, N_p, temperature, N_HI, N_HII
 -- @treturn Grid a complete grid structure with the filled j and k values for each requested frequency for each voxel within the dipole, these are null pointers elsewhere
-local function dipole_in_aabb(d, scale, gyroParams, interp_fn)
+local function dipole_in_aabb(d, scale, gyroParams, interp_fn, pool)
+    -- collectgarbage('stop')
     local p = d.params
     d.trans = d.trans and d.trans or maf.vec3()
 
@@ -409,43 +438,51 @@ local function dipole_in_aabb(d, scale, gyroParams, interp_fn)
     local zRange = math.ceil(scale * (d.aabb.z.max - d.aabb.z.min))
 
     local grid = allocate_grid(xRange+1, yRange+1, zRange+1)
+    -- local sampleCount = torch.IntTensor(xRange, yRange, zRange)
+    local sampleCount = torch.IntTensor((xRange+1) * (yRange+1) * (zRange+1)):zero()
+    local emptySamples = torch.IntTensor((xRange+1) * (yRange+1) * (zRange+1)):zero()
 
     local rSun = 960
     local sin, cos = math.sin, math.cos
     local min, max = math.min, math.max
 
-    local gyroIn = GyroIn()
-    local delta = DoubleCArray(#gyroParams.delta)
-    gyroIn.delta = delta
-    local energy = DoubleCArray(#gyroParams.energy)
-    gyroIn.energy = energy
-    local frequency = DoubleCArray(#gyroParams.frequency)
-    gyroIn.frequency = frequency
+    -- local gyroIn = GyroIn()
+    -- local delta = DoubleCArray(#gyroParams.delta)
+    -- gyroIn.delta = delta
+    -- for i = 0,#gyroParams.delta-1 do delta[i] = gyroParams.delta[i+1] end
+    -- gyroIn.deltaLen = #gyroParams.delta
 
-    for i = 0,#gyroParams.delta-1 do gyroIn.delta[i] = gyroParams.delta[i+1] end
-    gyroIn.deltaLen = #gyroParams.delta
+    -- local delta = torch.Tensor(gyroParams.delta)
+    -- local energy = torch.Tensor(gyroParams.energy)
+    local frequency = torch.Tensor(gyroParams.frequency)
 
-    for i = 0,#gyroParams.energy-1 do gyroIn.energy[i] = gyroParams.energy[i+1] end
-    gyroIn.energyLen = #gyroParams.energy
 
-    for i = 0,#gyroParams.frequency-1 do gyroIn.frequency[i] = gyroParams.frequency[i+1] end
-    gyroIn.frequencyLen = #gyroParams.frequency
+    -- local energy = DoubleCArray(#gyroParams.energy)
+    -- gyroIn.energy = energy
+    -- for i = 0,#gyroParams.energy-1 do energy[i] = gyroParams.energy[i+1] end
+    -- gyroIn.energyLen = #gyroParams.energy
 
-    local thermalData = ThermalRadiationData()
+    -- local frequency = DoubleCArray(#gyroParams.frequency)
+    -- gyroIn.frequency = frequency
+    -- for i = 0,#gyroParams.frequency-1 do frequency[i] = gyroParams.frequency[i+1] end
+    -- gyroIn.frequencyLen = #gyroParams.frequency
+
+    -- local thermalData = ThermalRadiationData()
 
     local index = non_uniform_3d_index_gen(xRange, yRange, zRange)
     local SolarRadiusVox = SolarRadiusCm / p.VoxToCm
 
-    local step = 0.5 / scale
+    local step = 1.0 / MultiSampleFactor / scale
     local arghDex = 1
     io.write('\n')
-    -- for xiIdx = aabb.x.min, aabb.x.max, step do
-    for x = d.aabb.x.min - d.trans.x, d.aabb.x.max - d.trans.x, step do
+    local freeList = List {}
+
+    for x = d.aabb.x.min - d.trans.x + 0.0*step, d.aabb.x.max - d.trans.x, step do
         io.write('\027[A\027[K')
         io.write("Approximate: ", arghDex, "/", p.count * scale^3, "\n")
         -- for eta = aabb.y.min, aabb.y.max, step do
-        for y = d.aabb.y.min - d.trans.y, d.aabb.y.max - d.trans.y, step do
-            for zetaIdx = d.aabb.z.min - d.trans.z, d.aabb.z.max - d.trans.z, step do
+        for y = d.aabb.y.min - d.trans.y + 0.0*step, d.aabb.y.max - d.trans.y, step do
+            for zetaIdx = d.aabb.z.min - d.trans.z + 0.0*step, d.aabb.z.max - d.trans.z, step do
                 
                 local xi = (x - p.numVox / 2) * cos(p.phi0) + y * sin(p.phi0)
                 local eta = y * cos(p.phi0) - (x - p.numVox / 2) * sin(p.phi0)
@@ -464,6 +501,10 @@ local function dipole_in_aabb(d, scale, gyroParams, interp_fn)
                     -- Altitude of a cell is its y coordinate * vox2cm
                     -- local h = (y - d.aabb.y.min + d.trans.y) * p.VoxToCm
                     local h = (y - p.depth + d.trans.y) * p.VoxToCm
+                    local data = interp_fn(h)
+                    local delta = torch.Tensor(data.beamDelta)
+                    local energy = torch.Tensor(data.beamEnergyLimits)
+                    local nel, np, temperature, HI, HII = data.nel, data.np, data.temperature, data.HI, data.HII
                     -- Loopwise position s is computed from xi and eta
                     -- local s = math.atan2(xi / d.aabb.xi.max, eta / d.aabb.eta.max) / (math.pi / 2)
                     -- local r = math.atan2(y / aabb.y.max, x / aabb.x.max) / (math.pi / 2)
@@ -485,48 +526,124 @@ local function dipole_in_aabb(d, scale, gyroParams, interp_fn)
                     local mu = -b0 * p.height^3
                     local b = (rVec * (3 * mu:dot(rVec)) - mu * rVec:length()^2) / (rVec:length()^5)
                     local bMag = b:length()
-                    gyroIn.bMag = bMag
-
                     local bDir = b:normalize():dot(d.rayDir)
                     local bAngle = math.acos(bDir)
-                    gyroIn.angle = bAngle * 180 / math.pi
 
-                    if gyroIn.angle > 87 and gyroIn.angle < 90 then
-                        gyroIn.angle = 87
-                    elseif gyroIn.angle >= 90 and gyroIn.angle < 93 then
-                        gyroIn.angle = 93
-                    elseif gyroIn.angle > 177 and gyroIn.angle < 180 then
-                        gyroIn.angle = 177
-                    elseif gyroIn.angle >= 180 and gyroIn.angle < 183 then
-                        gyroIn.angle = 183
-                    elseif gyroIn.angle < 3 then
-                        gyroIn.angle = 3
-                    end
-
-                    local data = interp_fn(h)
-                    gyroIn.nel = data.nel
-                    gyroIn.np = data.np
-                    thermalData.temperature = data.temperature
-                    thermalData.protonDensity = data.HII
-                    thermalData.neutralHDensity = data.HI
 
                     if (x > d.aabb.x.min and x < d.aabb.x.max) and
                        (y > d.aabb.y.min and y < d.aabb.y.max) and
                        (z > d.aabb.y.min and z < d.aabb.z.max)
                     then
-                        local data = Gyro.GyroSimulateC(gyroIn, thermalData)
-                        grid[index(xx, yy, zz)].jo = data.jo
-                        grid[index(xx, yy, zz)].jx = data.jx
-                        grid[index(xx, yy, zz)].ko = data.ko
-                        grid[index(xx, yy, zz)].kx = data.kx
-                        grid[index(xx, yy, zz)].jtherm = data.jtherm
-                        grid[index(xx, yy, zz)].ktherm = data.ktherm
+                        -- print(tostring(gyroIn))
+                        -- print(("%x"):format(tonumber(ffi.cast('intptr_t', gyroIn))))
+                        local idx = index(xx,yy,zz)
+                        pool:addjob(
+                            function() 
+                                local gyroIn = C.GyroIn()
+                                gyroIn.delta = delta:data()
+                                gyroIn.deltaLen = delta:size(1)
+
+                                gyroIn.energy = energy:data()
+                                gyroIn.energyLen = energy:size(1)
+
+                                gyroIn.frequency = frequency:data()
+                                gyroIn.frequencyLen = frequency:size(1)
+
+                                gyroIn.bMag = bMag
+                                gyroIn.angle = bAngle * 180 / math.pi
+
+                                if gyroIn.angle > 87 and gyroIn.angle < 90 then
+                                    gyroIn.angle = 87
+                                elseif gyroIn.angle >= 90 and gyroIn.angle < 93 then
+                                    gyroIn.angle = 93
+                                elseif gyroIn.angle > 177 and gyroIn.angle < 180 then
+                                    gyroIn.angle = 177
+                                elseif gyroIn.angle >= 180 and gyroIn.angle < 183 then
+                                    gyroIn.angle = 183
+                                elseif gyroIn.angle < 3 then
+                                    gyroIn.angle = 3
+                                end
+
+                                gyroIn.nel = nel
+                                gyroIn.np = np
+                                local thermalData = C.ThermalRadiationData()
+                                thermalData.temperature = temperature
+                                thermalData.protonDensity = HII
+                                thermalData.neutralHDensity = HI
+
+                                local data = C.Gyro.GyroSimulateC(gyroIn, thermalData)
+                                -- print(data.jo)
+                                -- print(('%x'):format(tonumber(C.ffi.cast('intptr_t', data.jo))))
+                                return torch.LongTensor({tonumber(C.ffi.cast('intptr_t', data.jo)),
+                                            tonumber(C.ffi.cast('intptr_t', data.jx)),
+                                            tonumber(C.ffi.cast('intptr_t', data.ko)),
+                                            tonumber(C.ffi.cast('intptr_t', data.kx)),
+                                            tonumber(C.ffi.cast('intptr_t', data.jtherm)),
+                                            tonumber(C.ffi.cast('intptr_t', data.ktherm))})
+
+                            end,
+                            function(ret)
+                                sampleCount:data()[idx] = sampleCount:data()[idx] + 1
+                                local indices = {'jo', 'jx', 'ko', 'kx', 'jtherm', 'ktherm'}
+
+                                if grid[idx].jo == nil then
+                                    for i=1,#indices do 
+                                        grid[idx][indices[i]] = ffi.cast('f64*', ret[i])
+                                    end
+                                else
+                                    for i=1,#indices do 
+                                        local coeff = ffi.cast('f64*', ret[i])
+                                        for j = 0,frequency:size(1)-1 do
+                                            grid[idx][indices[i]][j] = grid[idx][indices[i]][j] + coeff[j]
+                                        end
+                                    end
+                                    -- ffi.C.free(ffi.cast('void*', ret[1]))
+                                    freeList:append(ret[1])
+                                end
+                            end
+                            )
                     end
                     arghDex = arghDex + 1
+                elseif (x > d.aabb.x.min and x < d.aabb.x.max) and
+                       (y > d.aabb.y.min and y < d.aabb.y.max) and
+                       (z > d.aabb.y.min and z < d.aabb.z.max)
+                then
+                    local xx = math.floor(scale * x - scale * d.aabb.x.min + scale * d.trans.x)
+                    local yy = math.floor(scale * y - scale * d.aabb.y.min + scale * d.trans.y)
+                    local zz = math.floor(scale * z - scale * d.aabb.z.min + scale * d.trans.z)
+                    local idx = index(xx,yy,zz)
+                    emptySamples:data()[idx] = emptySamples:data()[idx] + 1
+                end
+            end
+        end
+        pool:synchronize()
+    end
+    pool:synchronize()
+
+    for i = 1,#freeList do
+        ffi.C.free(ffi.cast('void*', freeList[i]))
+    end
+
+    for x = 0, xRange-1 do
+        for y = 0, yRange-1 do
+            for z = 0, zRange-1 do
+                local idx = index(x, y ,z)
+                if grid[idx].jo ~= nil then
+                    local indices = {'jo', 'jx', 'ko', 'kx', 'jtherm', 'ktherm'}
+                    -- local sampleFactor = sampleCount:data()[idx] / (sampleCount:data()[idx] + emptySamples:data()[idx])
+                    local sampleFactor = sampleCount:data()[idx] + emptySamples:data()[idx]
+                    -- if emptySamples[idx] ~= 0 then sampleFactor = sampleFactor / emptySamples:data()[idx] end
+                    for i = 1,#indices do
+                        for f = 0,frequency:size(1)-1 do 
+                            grid[idx][indices[i]][f] = grid[idx][indices[i]][f] / sampleFactor
+                        end
+                    end
                 end
             end
         end
     end
+
+
 
     return {
             grid = grid,
@@ -546,8 +663,9 @@ end
 -- @int scale the scale factor to apply
 -- @number footpointFraction fraction of the y length of the AABB taken up by the footpoints
 -- @tparam function(height)->PlasmaParams interp_fn function returning, for a given height, the values of N_el, N_p, temperature, N_HI, N_HII
+-- @tparam threads.Threads Torch thread pool to use for computing the gyrosynchrotron coeffecients
 -- @treturn List{Grid} a List containing the two refined Grids shrunk around the footpoints with their computed parameters inside
-local function create_high_res_footpoints(d, gyroParams, scale, footpointFraction, interp_fn)
+local function create_high_res_footpoints(d, gyroParams, scale, footpointFraction, interp_fn, pool)
     -- Create a first aabb around each footpoint, then refine
     local eps = 0.5
     local aabb = d.aabb
@@ -614,11 +732,11 @@ local function create_high_res_footpoints(d, gyroParams, scale, footpointFractio
     local leftParams = copy(d)
     leftParams.aabb = leftFootpointAabb
     -- local leftGrid = visualise_dipole_param(leftParams, scale, gyroParams, 'height', interp_fn)
-    local leftGrid = dipole_in_aabb(leftParams, scale, gyroParams, interp_fn)
+    local leftGrid = dipole_in_aabb(leftParams, scale, gyroParams, interp_fn, pool)
     local rightParams = copy(d)
     rightParams.aabb = rightFootpointAabb
     -- local rightGrid = visualise_dipole_param(rightParams, scale, gyroParams, 'height', interp_fn)
-    local rightGrid = dipole_in_aabb(rightParams, scale, gyroParams, interp_fn)
+    local rightGrid = dipole_in_aabb(rightParams, scale, gyroParams, interp_fn, pool)
 
     return List {leftGrid, rightGrid}
 end
@@ -982,6 +1100,7 @@ return { solar_location = solar_location,
          visualise_dipole_param = visualise_dipole_param,
          create_high_res_footpoints = create_high_res_footpoints,
          dipole = dipole,
+         create_gyro_thread_pool = create_gyro_thread_pool,
          dipole_in_aabb = dipole_in_aabb,
          backup_grid = backup_grid,
          restore_backup_grid = restore_backup_grid,

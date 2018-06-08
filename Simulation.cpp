@@ -51,6 +51,9 @@ namespace Constant
 }
 namespace C = Constant;
 
+// constexpr auto AsyncOpts = std::launch::async | std::launch::deferred;
+constexpr auto AsyncOpts = std::launch::deferred;
+
 template <typename T>
 constexpr T
 Square(T val)
@@ -907,7 +910,7 @@ FrequencyAndCoefficients GyroSimulate(GyroSimData& d)
 
         // !!NOTE!! Don't use async|deferred with older gcc libraries. It doesn't launch
         // any other threads. Just have to hit it with all of them unfortunately.
-        futures.emplace_back(std::async(std::launch::async | std::launch::deferred,
+        futures.emplace_back(std::async(AsyncOpts,
                                         OrdinaryModeParameters, core, ordinaryCore, d, modeCoeffs));
 
         CoreVariables extraordinaryCore;
@@ -915,7 +918,7 @@ FrequencyAndCoefficients GyroSimulate(GyroSimData& d)
         extraordinaryCore.polarisationIndex = ref.extraordinaryPI;
         extraordinaryCore.refractionIndex = ref.extraordinaryRI;
 
-        futures.emplace_back(std::async(std::launch::async | std::launch::deferred,
+        futures.emplace_back(std::async(AsyncOpts,
                                         ExtraordinaryModeParameters, core, extraordinaryCore, d, modeCoeffs));
 
     }
