@@ -262,9 +262,9 @@ function main()
 
         if true then
             -- This code shows how to serialise the simulation data to disk and load it again
-            Thyr.backup_grid(grid3HD, gyroParams, prefix..'/base_'..rotIdx)
-            Thyr.backup_grid(highResRegions[1], gyroParams, prefix..'/hr1_'..rotIdx)
-            Thyr.backup_grid(highResRegions[2], gyroParams, prefix..'/hr2_'..rotIdx)
+            Thyr.backup_grid(grid3HD, gyroParams, prefix..'/base')
+            Thyr.backup_grid(highResRegions[1], gyroParams, prefix..'/hr1')
+            Thyr.backup_grid(highResRegions[2], gyroParams, prefix..'/hr2')
 
             -- local grid3HD, gyroParams = Thyr.restore_backup_grid(prefix..'/base_'..rotIdx)
             -- local hr1, _ = Thyr.restore_backup_grid(prefix..'/hr1_'..rotIdx)
@@ -280,7 +280,6 @@ function main()
                 :plot()
                 :colorbar()
                 :imshow(imageList[freqIdx][mode], resolution, resolution)
-                -- :print('fail'..plotIdx..'.png')
                 :end_frame()
         end
         plot('o', 1)

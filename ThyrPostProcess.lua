@@ -182,7 +182,7 @@ end
 
 function main()
     Plyght:init()
-    local prefix = 'c7DataHR'
+    local prefix = 'c7Data'
     local title = 'High-Res C7 Atmosphere'
     local bgPrefix = 'c7Data'
 
