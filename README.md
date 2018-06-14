@@ -10,3 +10,6 @@ Running Thyr:
 - Inspect and/or modify the `ThyrDriver.lua` file (should be well commented)
 - Run Plyght (i.e. `python3 Plyght/plyght.py`) and leave in running in background
 - Run the simulation `th ThyrDriver.lua` (after whatever variant of `torch_activate` is required on your system)
+
+
+All files under [MIT License](https://opensource.org/licenses/MIT) (c) 2015-2017 Christopher Osborne with the exception of `gauss_legendre.*` (c) 2007-2010 Pavel Holoborodko under modified BSD 3-clause license with additional no commercial use clause (see files for more information).

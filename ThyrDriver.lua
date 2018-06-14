@@ -1,4 +1,6 @@
 --- Driver file for Thyr Gyrosynchrotron simulations
+-- Copyright (c) 2015-2018 Christopher Osborne, University of Glasgow
+-- MIT License: https://opensource.org/licenses/MIT
 -- This file provides the specifics of the flare model we want to simulate, sets up and runs the simulation.
 -- File to be read "C-style" i.e. with the main function at the bottom
 assert(loadfile('Parse.lua'))()

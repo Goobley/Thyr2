@@ -1,3 +1,5 @@
+// Copyright (c) 2015-2018 Christopher Osborne, University of Glasgow
+// MIT License: https://opensource.org/licenses/MIT
 #include "Simulation.hpp"
 #include <tuple>
 #include <algorithm>

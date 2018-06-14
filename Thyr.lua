@@ -1,8 +1,7 @@
 --- A tool for simulating 3D gyrosynchrotron emission.
--- C M J Osborne - University of Glasgow, 2018
---
--- MIT License
---
+-- Copyright (c) 2015-2018 Christopher Osborne, University of Glasgow
+-- MIT License: https://opensource.org/licenses/MIT
+
 -- @module Thyr
 
 
@@ -88,11 +87,7 @@ local function non_uniform_3d_index_gen(xVox, yVox, zVox)
         assert(x < xVox, 'Check translation vector')
         assert(y < yVox, 'Check translation vector')
         assert(z < zVox, 'Check translation vector')
-        if x < 0 then print('x', x) end
-        if y < 0 then print('y', y) end
-        if z < 0 then print('z', z) end
         local val =  (z) * xVox * yVox + (y) * xVox + x
-        if val < 0 then print(x, y , z) assert(false, 'borked') end
         return val
     end
     return f 
@@ -289,14 +284,14 @@ local function visualise_dipole_param(d, scale, gyroParams, paramName, interp_fn
     local SolarRadiusVox = SolarRadiusCm / p.VoxToCm
 
     local step = 0.5 / scale
-    local arghDex = 1
+    local iterCount = 1
     -- for xiIdx = aabb.x.min, aabb.x.max, step do
     io.write('\n')
     for x = d.aabb.x.min - d.trans.x, d.aabb.x.max - d.trans.x, step do
         -- Use ANSI escape code. Don't be fooled by the \033 you see in C examples, C
         -- takes these escaped characters in octal, lua is in decimal 33octal = 27dec
         io.write('\027[A\027[K')
-        io.write("Approximate: ", arghDex, "/", p.count * scale^3, "\n")
+        io.write("Approximate: ", iterCount, "/", p.count * scale^3, "\n")
         -- for eta = aabb.y.min, aabb.y.max, step do
         for y = d.aabb.y.min - d.trans.y, d.aabb.y.max - d.trans.y, step do
             for zetaIdx = d.aabb.z.min - d.trans.z, d.aabb.z.max - d.trans.z, step do
@@ -386,7 +381,7 @@ local function visualise_dipole_param(d, scale, gyroParams, paramName, interp_fn
                                       }
                         grid[index(xx, yy, zz)] = param[paramName]
                     end
-                    arghDex = arghDex + 1
+                    iterCount = iterCount + 1
                 end
             end
         end
@@ -405,7 +400,7 @@ local function visualise_dipole_param(d, scale, gyroParams, paramName, interp_fn
 end
 
 --- Construct a thread pool to parallelise computation of the gyrosynchrotron coefficients
--- @int number of threads to use
+-- @int numThreads number of threads to use
 -- @treturn threads.Threads Thread pool object used in torch with initialised threads
 local function create_gyro_thread_pool(numThreads)
     print('Spawning '..numThreads..' threads for gyrosynchrotron calculations')
@@ -432,9 +427,9 @@ end
 -- @int scale the scale factor to apply
 -- @tparam GyroParamTable gyroParams the shared parameters for the Gyro calculation
 -- @tparam function(height)->PlasmaParams interp_fn function returning, for a given height, the values of N_el, N_p, temperature, N_HI, N_HII
+-- @tparam threads.Threads pool Torch thread pool to use for computing the gyrosynchrotron coeffecients in parallel
 -- @treturn Grid a complete grid structure with the filled j and k values for each requested frequency for each voxel within the dipole, these are null pointers elsewhere
 local function dipole_in_aabb(d, scale, gyroParams, interp_fn, pool)
-    -- collectgarbage('stop')
     local p = d.params
     d.trans = d.trans and d.trans or maf.vec3()
 
@@ -443,49 +438,25 @@ local function dipole_in_aabb(d, scale, gyroParams, interp_fn, pool)
     local zRange = math.ceil(scale * (d.aabb.z.max - d.aabb.z.min))
 
     local grid = allocate_grid(xRange+1, yRange+1, zRange+1)
-    -- local sampleCount = torch.IntTensor(xRange, yRange, zRange)
     local sampleCount = torch.IntTensor((xRange+1) * (yRange+1) * (zRange+1)):zero()
-    local emptySamples = torch.IntTensor((xRange+1) * (yRange+1) * (zRange+1)):zero()
 
     local rSun = 960
     local sin, cos = math.sin, math.cos
     local min, max = math.min, math.max
 
-    -- local gyroIn = GyroIn()
-    -- local delta = DoubleCArray(#gyroParams.delta)
-    -- gyroIn.delta = delta
-    -- for i = 0,#gyroParams.delta-1 do delta[i] = gyroParams.delta[i+1] end
-    -- gyroIn.deltaLen = #gyroParams.delta
-
-    -- local delta = torch.Tensor(gyroParams.delta)
-    -- local energy = torch.Tensor(gyroParams.energy)
     local frequency = torch.Tensor(gyroParams.frequency)
-
-
-    -- local energy = DoubleCArray(#gyroParams.energy)
-    -- gyroIn.energy = energy
-    -- for i = 0,#gyroParams.energy-1 do energy[i] = gyroParams.energy[i+1] end
-    -- gyroIn.energyLen = #gyroParams.energy
-
-    -- local frequency = DoubleCArray(#gyroParams.frequency)
-    -- gyroIn.frequency = frequency
-    -- for i = 0,#gyroParams.frequency-1 do frequency[i] = gyroParams.frequency[i+1] end
-    -- gyroIn.frequencyLen = #gyroParams.frequency
-
-    -- local thermalData = ThermalRadiationData()
 
     local index = non_uniform_3d_index_gen(xRange, yRange, zRange)
     local SolarRadiusVox = SolarRadiusCm / p.VoxToCm
 
     local step = 1.0 / MultiSampleFactor / scale
-    local arghDex = 1
+    local iterCount = 1
     io.write('\n')
     local freeList = List {}
 
     for x = d.aabb.x.min - d.trans.x + 0.0*step, d.aabb.x.max - d.trans.x, step do
         io.write('\027[A\027[K')
-        io.write("Approximate: ", arghDex, "/", p.count * scale^3, "\n")
-        -- for eta = aabb.y.min, aabb.y.max, step do
+        io.write("Approximate: ", iterCount, "/", p.count * scale^3, "\n")
         for y = d.aabb.y.min - d.trans.y + 0.0*step, d.aabb.y.max - d.trans.y, step do
             for zetaIdx = d.aabb.z.min - d.trans.z + 0.0*step, d.aabb.z.max - d.trans.z, step do
                 
@@ -539,8 +510,6 @@ local function dipole_in_aabb(d, scale, gyroParams, interp_fn, pool)
                        (y > d.aabb.y.min and y < d.aabb.y.max) and
                        (z > d.aabb.y.min and z < d.aabb.z.max)
                     then
-                        -- print(tostring(gyroIn))
-                        -- print(("%x"):format(tonumber(ffi.cast('intptr_t', gyroIn))))
                         local idx = index(xx,yy,zz)
                         pool:addjob(
                             function() 
@@ -577,8 +546,7 @@ local function dipole_in_aabb(d, scale, gyroParams, interp_fn, pool)
                                 thermalData.neutralHDensity = HI
 
                                 local data = C.Gyro.GyroSimulateC(gyroIn, thermalData)
-                                -- print(data.jo)
-                                -- print(('%x'):format(tonumber(C.ffi.cast('intptr_t', data.jo))))
+                                -- This is a bit messy, but always seems to work in practice
                                 return torch.LongTensor({tonumber(C.ffi.cast('intptr_t', data.jo)),
                                             tonumber(C.ffi.cast('intptr_t', data.jx)),
                                             tonumber(C.ffi.cast('intptr_t', data.ko)),
@@ -602,13 +570,12 @@ local function dipole_in_aabb(d, scale, gyroParams, interp_fn, pool)
                                             grid[idx][indices[i]][j] = grid[idx][indices[i]][j] + coeff[j]
                                         end
                                     end
-                                    -- ffi.C.free(ffi.cast('void*', ret[1]))
                                     freeList:append(ret[1])
                                 end
                             end
                             )
                     end
-                    arghDex = arghDex + 1
+                    iterCount = iterCount + 1
                 elseif (x > d.aabb.x.min and x < d.aabb.x.max) and
                        (y > d.aabb.y.min and y < d.aabb.y.max) and
                        (z > d.aabb.y.min and z < d.aabb.z.max)
@@ -617,11 +584,10 @@ local function dipole_in_aabb(d, scale, gyroParams, interp_fn, pool)
                     local yy = math.floor(scale * y - scale * d.aabb.y.min + scale * d.trans.y)
                     local zz = math.floor(scale * z - scale * d.aabb.z.min + scale * d.trans.z)
                     local idx = index(xx,yy,zz)
-                    emptySamples[idx+1] = emptySamples[idx+1] + 1
+                    sampleCount[idx+1] = sampleCount[idx+1] + 1
                 end
             end
         end
-        -- pool:synchronize()
     end
     pool:synchronize()
 
@@ -635,9 +601,7 @@ local function dipole_in_aabb(d, scale, gyroParams, interp_fn, pool)
                 local idx = index(x, y ,z)
                 if grid[idx].jo ~= nil then
                     local indices = {'jo', 'jx', 'ko', 'kx', 'jtherm', 'ktherm'}
-                    -- local sampleFactor = sampleCount:data()[idx] / (sampleCount:data()[idx] + emptySamples:data()[idx])
-                    local sampleFactor = sampleCount[idx+1] + emptySamples[idx+1]
-                    -- if emptySamples[idx] ~= 0 then sampleFactor = sampleFactor / emptySamples:data()[idx] end
+                    local sampleFactor = sampleCount[idx+1]
                     for i = 1,#indices do
                         for f = 0,frequency:size(1)-1 do 
                             grid[idx][indices[i]][f] = grid[idx][indices[i]][f] / sampleFactor
@@ -668,7 +632,7 @@ end
 -- @int scale the scale factor to apply
 -- @number footpointFraction fraction of the y length of the AABB taken up by the footpoints
 -- @tparam function(height)->PlasmaParams interp_fn function returning, for a given height, the values of N_el, N_p, temperature, N_HI, N_HII
--- @tparam threads.Threads Torch thread pool to use for computing the gyrosynchrotron coeffecients
+-- @tparam threads.Threads pool Torch thread pool to use for computing the gyrosynchrotron coeffecients in parallel
 -- @treturn List{Grid} a List containing the two refined Grids shrunk around the footpoints with their computed parameters inside
 local function create_high_res_footpoints(d, gyroParams, scale, footpointFraction, interp_fn, pool)
     -- Create a first aabb around each footpoint, then refine
@@ -829,7 +793,7 @@ local function average_path_trace(lowRes, highRes, resolution, gyroParams)
     local AuxSampleRate = 0.01
     local floor = math.floor
     local rayDir = lowRes.rayDir
-    local rotMat= lowRes.rotMat
+    local rotMat = lowRes.rotMat
     for u = 1, resolution do
         for v = 1, resolution do
             local x = (u / resolution * numVox) - numVox / 2
@@ -1007,7 +971,6 @@ local function path_trace(lowRes, highRes, resolution, gyroParams)
                            (r.y > grid.aabb.y.min and r.y < grid.aabb.y.max) and
                            (r.z > grid.aabb.y.min and r.z < grid.aabb.z.max)
                         then
-                            -- print(xx, yy, zz)
                             if grid.grid[grid.idx(xx, yy, zz)].jo ~= nil then
                                 local p = grid.grid[grid.idx(xx, yy, zz)]
 
@@ -1039,8 +1002,6 @@ local function path_trace(lowRes, highRes, resolution, gyroParams)
                         end
                     end
                 end
-                -- print(u, v)
-                -- grid2[idx2(u, v)] = (3e10)^2 * io / (2 * 1.38e-16 * gyroParams.frequency[frequencyIdx]^2)
                 local idx = idx2(u,v)
                 for f = 1, #gyroParams.frequency do
                     local ims = imageList[f]
