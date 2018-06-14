@@ -133,7 +133,7 @@ local function plot_atmos_data(atmosData, prefix)
     prefix = prefix and prefix ..'.png' or 'atmosData.png'
     Plyght:start_frame()
           :plot()
-          :x_range(0, 5e8)
+          :x_range(0, 3e8)
           :plot_type('semilogy')
           :line_label('Temperature')
           :x_label('Height [cm]')
@@ -141,7 +141,7 @@ local function plot_atmos_data(atmosData, prefix)
           :line(atmosData.height, atmosData.temperature)
           :legend()
           :plot()
-          :x_range(0, 5e8)
+          :x_range(0, 3e8)
           :plot_type('semilogy')
           :x_label('Height [cm]')
           :y_label('Number density [cm$^-3$]')
@@ -156,7 +156,7 @@ local function plot_atmos_data(atmosData, prefix)
           :end_frame()
 end
 
-function main(plotIdx)
+function main()
     -- Initialise
     local startTime = os.time()
     Plyght:init()
@@ -166,14 +166,7 @@ function main(plotIdx)
     -- Compute non-thermal electron drop off with increasing density
     nel_stopping_array(atmosData)
     -- Produce a plot of the atmosphere if Plyght is running
-    plot_atmos_data(atmosData, prefix)
-    -- Plyght:start_frame()
-    --       :plot()
-    --       :plot_type('semilogy')
-    --       :x_range(0, 5e8)
-    --       :line(atmosData.height, atmosData.minBeamEnergy)
-    --       :line(atmosData.height, atmosData.maxBeamEnergy)
-    --       :end_frame()
+    -- plot_atmos_data(atmosData, prefix)
 
     -- Number of low-resolution voxels to be used per side of cube.
     local numVox = 32
@@ -252,26 +245,31 @@ function main(plotIdx)
                         rotMat = rotMat,
                     }
     -- Parameters needed for the simulation of GS emission
-    local gyroParams = { frequency = {1e9, 10e9, 34e9, 70e9, 100e9}, energy = energyLimits, delta = delta }
+    local gyroParams = { frequency = { 1e9, 2e9, 3.75e9, 9.4e9, 17e9, 35e9, 80e9, 110e9, 250e9 } }
     local plot
 
     if true then
         -- Perform gyro simulation
-        local pool = Thyr.create_gyro_thread_pool(12)
+        local gyroThreads = 4
+        local gyroFile = io.open('CoreCount', 'r')
+        if gyroFile ~= nil then gyroThreads = gyroFile:read('*n') gyroFile:close() end
+
+
+        local pool = Thyr.create_gyro_thread_pool(gyroThreads)
         local grid3HD = Thyr.dipole_in_aabb(dipoleData, scale, gyroParams, interp_fn, pool)
         print('Making High-Res Footpoints: ', os.time() - startTime)
         local highResRegions = Thyr.create_high_res_footpoints(dipoleData, gyroParams, 6, 0.25, interp_fn, pool)
 
-        if false then
+        if true then
             -- This code shows how to serialise the simulation data to disk and load it again
-            Thyr.backup_grid(grid3HD, gyroParams, prefix..'/base')
-            Thyr.backup_grid(highResRegions[1], gyroParams, prefix..'/hr1')
-            Thyr.backup_grid(highResRegions[2], gyroParams, prefix..'/hr2')
+            Thyr.backup_grid(grid3HD, gyroParams, prefix..'/base_'..rotIdx)
+            Thyr.backup_grid(highResRegions[1], gyroParams, prefix..'/hr1_'..rotIdx)
+            Thyr.backup_grid(highResRegions[2], gyroParams, prefix..'/hr2_'..rotIdx)
 
-            local grid3HD2, gyroParams2 = Thyr.restore_backup_grid(prefix..'/base')
-            local hr1, _ = Thyr.restore_backup_grid(prefix..'/hr1')
-            local hr2, _ = Thyr.restore_backup_grid(prefix..'/hr2')
-            local highRes = List {hr1, hr2}
+            -- local grid3HD, gyroParams = Thyr.restore_backup_grid(prefix..'/base_'..rotIdx)
+            -- local hr1, _ = Thyr.restore_backup_grid(prefix..'/hr1_'..rotIdx)
+            -- local hr2, _ = Thyr.restore_backup_grid(prefix..'/hr2_'..rotIdx)
+            -- local highResRegions = List {hr1, hr2}
         end
 
         print('Path Tracing: ', os.time() - startTime)
@@ -282,7 +280,7 @@ function main(plotIdx)
                 :plot()
                 :colorbar()
                 :imshow(imageList[freqIdx][mode], resolution, resolution)
-                :print('fail'..plotIdx..'.png')
+                -- :print('fail'..plotIdx..'.png')
                 :end_frame()
         end
         plot('o', 1)
@@ -312,8 +310,3 @@ function main(plotIdx)
 end
 
 plot = main()
--- for i = 1,20 do
---     main(i)
---     collectgarbage()
---     collectgarbage()
--- end

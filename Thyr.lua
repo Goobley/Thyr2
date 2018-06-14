@@ -88,7 +88,12 @@ local function non_uniform_3d_index_gen(xVox, yVox, zVox)
         assert(x < xVox, 'Check translation vector')
         assert(y < yVox, 'Check translation vector')
         assert(z < zVox, 'Check translation vector')
-        return (z) * xVox * yVox + (y) * xVox + x
+        if x < 0 then print('x', x) end
+        if y < 0 then print('y', y) end
+        if z < 0 then print('z', z) end
+        local val =  (z) * xVox * yVox + (y) * xVox + x
+        if val < 0 then print(x, y , z) assert(false, 'borked') end
+        return val
     end
     return f 
 end
@@ -359,7 +364,7 @@ local function visualise_dipole_param(d, scale, gyroParams, paramName, interp_fn
                     end
 
                     local data = interp_fn(h)
-                    gyroIn.nel = data.nel
+                    gyroIn.nel = data.nel and data.nel or 0
                     gyroIn.np = data.np
                     thermalData.temperature = data.temperature
                     thermalData.protonDensity = data.HII
@@ -403,9 +408,9 @@ end
 -- @int number of threads to use
 -- @treturn threads.Threads Thread pool object used in torch with initialised threads
 local function create_gyro_thread_pool(numThreads)
+    print('Spawning '..numThreads..' threads for gyrosynchrotron calculations')
     return threads.Threads(numThreads,
                     function()
-                        print('loaded'..__threadid)
                         local ffi = require('ffi')
                         C = {}
                         ffi.cdef(defsStr)
@@ -583,7 +588,7 @@ local function dipole_in_aabb(d, scale, gyroParams, interp_fn, pool)
 
                             end,
                             function(ret)
-                                sampleCount:data()[idx] = sampleCount:data()[idx] + 1
+                                sampleCount[idx+1] = sampleCount[idx+1] + 1
                                 local indices = {'jo', 'jx', 'ko', 'kx', 'jtherm', 'ktherm'}
 
                                 if grid[idx].jo == nil then
@@ -612,11 +617,11 @@ local function dipole_in_aabb(d, scale, gyroParams, interp_fn, pool)
                     local yy = math.floor(scale * y - scale * d.aabb.y.min + scale * d.trans.y)
                     local zz = math.floor(scale * z - scale * d.aabb.z.min + scale * d.trans.z)
                     local idx = index(xx,yy,zz)
-                    emptySamples:data()[idx] = emptySamples:data()[idx] + 1
+                    emptySamples[idx+1] = emptySamples[idx+1] + 1
                 end
             end
         end
-        pool:synchronize()
+        -- pool:synchronize()
     end
     pool:synchronize()
 
@@ -631,7 +636,7 @@ local function dipole_in_aabb(d, scale, gyroParams, interp_fn, pool)
                 if grid[idx].jo ~= nil then
                     local indices = {'jo', 'jx', 'ko', 'kx', 'jtherm', 'ktherm'}
                     -- local sampleFactor = sampleCount:data()[idx] / (sampleCount:data()[idx] + emptySamples:data()[idx])
-                    local sampleFactor = sampleCount:data()[idx] + emptySamples:data()[idx]
+                    local sampleFactor = sampleCount[idx+1] + emptySamples[idx+1]
                     -- if emptySamples[idx] ~= 0 then sampleFactor = sampleFactor / emptySamples:data()[idx] end
                     for i = 1,#indices do
                         for f = 0,frequency:size(1)-1 do 
@@ -929,8 +934,9 @@ local function path_trace(lowRes, highRes, resolution, gyroParams)
     local PrimarySampleRate = 0.1
     local AuxSampleRate = 0.01
     local floor = math.floor
+    local max = math.max
     local rayDir = lowRes.rayDir
-    local rotMat= lowRes.rotMat
+    local rotMat = lowRes.rotMat
     for u = 1, resolution do
         for v = 1, resolution do
             local x = (u / resolution * numVox) - numVox / 2
@@ -993,14 +999,15 @@ local function path_trace(lowRes, highRes, resolution, gyroParams)
                         local r = (rayOrigin + rayDir * t)
                         local length = sortedIntList[j].sampleRate * lowRes.params.VoxToCm
 
-                        local xx = floor(grid.scale * (r.x - grid.aabb.x.min))
-                        local yy = floor(grid.scale * (r.y - grid.aabb.y.min))
-                        local zz = floor(grid.scale * (r.z - grid.aabb.z.min))
+                        local xx = max(floor(grid.scale * (r.x - grid.aabb.x.min)), 0)
+                        local yy = max(floor(grid.scale * (r.y - grid.aabb.y.min)), 0)
+                        local zz = max(floor(grid.scale * (r.z - grid.aabb.z.min)), 0)
 
                         if (r.x > grid.aabb.x.min and r.x < grid.aabb.x.max) and
                            (r.y > grid.aabb.y.min and r.y < grid.aabb.y.max) and
                            (r.z > grid.aabb.y.min and r.z < grid.aabb.z.max)
                         then
+                            -- print(xx, yy, zz)
                             if grid.grid[grid.idx(xx, yy, zz)].jo ~= nil then
                                 local p = grid.grid[grid.idx(xx, yy, zz)]
 
@@ -1032,6 +1039,7 @@ local function path_trace(lowRes, highRes, resolution, gyroParams)
                         end
                     end
                 end
+                -- print(u, v)
                 -- grid2[idx2(u, v)] = (3e10)^2 * io / (2 * 1.38e-16 * gyroParams.frequency[frequencyIdx]^2)
                 local idx = idx2(u,v)
                 for f = 1, #gyroParams.frequency do
