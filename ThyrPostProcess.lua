@@ -107,9 +107,14 @@ end
 
 local function load_grids_and_trace(prefix, resolution)
     local grid3HD2, gyroParams2 = Thyr.restore_backup_grid(prefix..'/base')
-    local hr1, _ = Thyr.restore_backup_grid(prefix..'/hr1')
-    local hr2, _ = Thyr.restore_backup_grid(prefix..'/hr2')
-    local highRes = List {hr1, hr2}
+    -- For my uses, when the prefix ends with LR then it's a low-res grid and doesn't have high-res refinements
+    local highRes = List {}
+    if not prefix:match('LR$') then
+        local hr1, _ = Thyr.restore_backup_grid(prefix..'/hr1')
+        local hr2, _ = Thyr.restore_backup_grid(prefix..'/hr2')
+        highRes:append(hr1)
+        highRes:append(hr2)
+    end
 
     local imageList, idx2 = Thyr.path_trace(grid3HD2, highRes, resolution, gyroParams2)
     return imageList, idx2, grid3HD2, gyroParams2, highRes
@@ -159,6 +164,38 @@ local function map_to_csv(prefix, imList, idx, frequencies, resolution)
         end
         csv:flush()
         csv:close()
+    end
+end
+
+local function component_maps_to_csv(prefix, imList, idx, frequencies, resolution)
+    for f = 1, #frequencies do
+        local csvO = io.open(prefix..'_o_'..f..'.csv', 'w') 
+        local csvX = io.open(prefix..'_x_'..f..'.csv', 'w') 
+        local csvTherm = io.open(prefix..'_therm_'..f..'.csv', 'w') 
+        for u = 1, resolution do
+            for v = 1, resolution do
+                local i = idx(u, v)
+                csvO:write(imList[f]['o'][i])
+                csvX:write(imList[f]['x'][i])
+                csvTherm:write(imList[f]['therm'][i])
+                if v ~= resolution then
+                    csvO:write(',')
+                    csvX:write(',')
+                    csvTherm:write(',')
+                end
+            end
+            if u ~= resolution then
+                csvO:write('\n')
+                csvX:write('\n')
+                csvTherm:write('\n')
+            end
+        end
+        csvO:flush()
+        csvX:flush()
+        csvTherm:flush()
+        csvO:close()
+        csvX:close()
+        csvTherm:close()
     end
 end
 
@@ -306,6 +343,7 @@ function main()
     plotPol()
 
     totemission_to_csv(prefix, imageList, idx2, gyroParams2.frequency, resolution)
+    component_maps_to_csv(prefix, imageList, idx2, gyroParams2.frequency, resolution)
     map_to_csv(prefix..'_pol', polMaps, idx2, gyroParams2.frequency, resolution)
 
     return plotPol
