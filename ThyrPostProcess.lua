@@ -10,6 +10,8 @@ local ArcToCMSun = math.pi / 180.0 / 3600.0 * AstroUnit
 local SpeedLight = 3e10
 local Boltzmann = 1.3806e-16
 
+local Dpi = 300
+
 local function compute_total_emission_maps(imList, idx, frequencies, resolution)
     local totalMaps = List()
     for f = 1, #frequencies do
@@ -182,7 +184,8 @@ end
 
 function main()
     Plyght:init()
-    local prefix = 'c7Data'
+    Plyght:start_frame():plot():fig_size(6, 6):end_frame()
+    local prefix = 'c7DataHR'
     local title = 'High-Res C7 Atmosphere'
     local bgPrefix = 'c7Data'
 
@@ -202,9 +205,10 @@ function main()
         Plyght:start_frame()
             :plot()
             :colorbar()
-            :title(('Total Brightness Temperature at %.2f GHz for '):format(gyroParams2.frequency[freqIdx] / 1e9) .. title)
+            :fig_size(6,6)
+            :title(('Total Brightness Temperature at %.2f GHz!!nfor '):format(gyroParams2.frequency[freqIdx] / 1e9) .. title)
             :imshow(totalMaps[freqIdx], resolution, resolution)
-            :print('TotTb_'..prefix..'_'..freqIdx..'.png')
+            :print('TotTb_'..prefix..'_'..freqIdx..'.png', Dpi)
             :end_frame()
     end
     local plot2 = function()
@@ -227,6 +231,7 @@ function main()
     local plot3 = function()
         Plyght:start_frame()
             :plot()
+            :fig_size(6,4)
             :x_label('Frequency [Hz]')
             :y_label('Integrated Flux [sfu]')
             :title('Integrated Flux vs. Frequency for '..title)
@@ -241,7 +246,7 @@ function main()
             :line(gyroParams2.frequency, thermFlux)
             :y_range(1, 1.1*maxIntFlux)
             :legend()
-            :print('IntFlux_'..prefix..'.png')
+            :print('IntFlux_'..prefix..'.png', Dpi)
             :end_frame()
     end
     plot3()
@@ -256,12 +261,13 @@ function main()
         end
         Plyght:start_frame()
             :plot()
+            :fig_size(6,4)
             :x_label('Frequency [Hz]')
             :y_label('Integrated Flare Excess [sfu]')
             :title('Integrated Excess vs. Frequency for '..title)
             :plot_type('loglog')
             :line(gyroParams2.frequency, excessFlux)
-            :print('IntExcess_'..prefix..'.png')
+            :print('IntExcess_'..prefix..'.png', Dpi)
             :end_frame()
     end
 
@@ -272,12 +278,22 @@ function main()
 
     local polMaps = compute_polarisation_fraction_maps(imageList, idx2, bAngleImage, gyroParams2.frequency, resolution)
     local plot4 = function(freqIdx)
+        local range = 0
+        local abs, max = math.abs, math.max
+        for u = 1, resolution do
+            for v = 1, resolution do
+                local i = idx2(u,v)
+                range = max(abs(polMaps[freqIdx][i]), range)
+            end
+        end
         Plyght:start_frame()
             :plot()
+            :fig_size(6,6)
             :colorbar()
-            :title(('Polarisation Fraction at %.2f GHz for '):format(gyroParams2.frequency[freqIdx] / 1e9) .. title)
-            :imshow(polMaps[freqIdx], resolution, resolution)
-            :print('PolFrac_'..prefix..'_'..freqIdx..'.png')
+            :colormap('seismic')
+            :title(('Polarisation Fraction at %.2f GHz!!nfor '):format(gyroParams2.frequency[freqIdx] / 1e9) .. title)
+            :imshow(polMaps[freqIdx], resolution, resolution, -range, range)
+            :print('PolFrac_'..prefix..'_'..freqIdx..'.png', Dpi)
             :end_frame()
     end
     local plotPol = function()
@@ -289,8 +305,8 @@ function main()
     end
     plotPol()
 
-    -- totemission_to_csv(prefix, imageList, idx2, gyroParams2.frequency, resolution)
-    -- map_to_csv(prefix..'_pol', polMaps, idx2, gyroParams2.frequency, resolution)
+    totemission_to_csv(prefix, imageList, idx2, gyroParams2.frequency, resolution)
+    map_to_csv(prefix..'_pol', polMaps, idx2, gyroParams2.frequency, resolution)
 
     return plotPol
 
