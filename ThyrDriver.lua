@@ -146,7 +146,7 @@ local function plot_atmos_data(atmosData, prefix)
           :x_range(0, 3e8)
           :plot_type('semilogy')
           :x_label('Height [cm]')
-          :y_label('Number density [cm$^-3$]')
+          :y_label('Number density [cm$^{-3}$]')
           :line_label('Non-thermal electron density')
           :line(atmosData.height, atmosData.nel)
           :line_label('Neutral hydrogen density')
@@ -168,10 +168,29 @@ function main()
     -- Compute non-thermal electron drop off with increasing density
     nel_stopping_array(atmosData)
     -- Produce a plot of the atmosphere if Plyght is running
-    -- plot_atmos_data(atmosData, prefix)
+    plot_atmos_data(atmosData, prefix)
+
+    -- local jsks = Thyr.gyro_sim()
+    -- local emission = jsks:map(function(v) return v[1] / v[2] * (1 - math.exp(-(v[2] * 1e6)))  end)
+    -- local emissionMax = 0
+    -- for i = 1, #emission do
+    --    emissionMax = math.max(emission[i], emissionMax) 
+    -- end
+    -- emission:transform(function(v) return v / emissionMax end)
+
+    -- Plyght:start_frame()
+    --       :plot()
+    --       :plot_type('loglog')
+    --       :line(List.range(1,100, 0.25), emission)
+    --       :x_label('Frequency (GHz)')
+    --       :y_label('Intensity (arbitrary)')
+    --       :title('Sample Gyrosynchrotron Emission from Homogeneous Volume')
+    --       :print('Gyro1D.png')
+    --       :end_frame()
+
 
     -- Number of low-resolution voxels to be used per side of cube.
-    local numVox = 32
+    local numVox = 128
     -- Side length of voxel grid, i.e. this needs to be able to contain the flare.
     local gridSide = 80 * Thyr.ArcToCm
     local VoxToCm = gridSide / numVox
@@ -191,7 +210,7 @@ function main()
     print(("Height in km: %f, \": %f"):format(height * VoxToCm / 1e5, height * VoxToCm / Thyr.ArcToCm ))
 
     -- Make basic dipole shape
-    local resolution = 512 
+    local resolution = 1024
     local trans = maf.vec3(0, 0, 0)
     print('Making Basic Dipole: ', os.time() - startTime)
     local grid3, idx, aabb, count = Thyr.dipole(dipoleParams, trans)
@@ -232,7 +251,8 @@ function main()
                       end
     print('Making Accurate Dipole: ', os.time() - startTime)
     -- Create the rotation quaternion for the object (effectively just a fancy form of a rotation matrix)
-    local rotMat = Thyr.solar_location(0, -20, 30, 70)
+    -- local rotMat = Thyr.solar_location(0, -20, 30, 70)
+    local rotMat = Thyr.solar_location(0, 0, 90, 0)
     -- Deduce the unit direction vector of our parallel rays from the quaternion
     local rayDir = Thyr.ray_direction(rotMat)
 

@@ -27,13 +27,27 @@ local function compute_total_emission_maps(imList, idx, frequencies, resolution)
 end
 
 local function integrate_flux(imList, idx, resolution, viewSize, frequencies)
-    local pxArea = (viewSize / resolution)^2
+    local resolutionX, resolutionY
+    if type(resolution) ==  'table' then 
+        resolutionX, resolutionY = table.unpack(resolution) 
+    else 
+        resolutionX = resolution
+        resolutionY = resolution 
+    end
+    local viewSizeX, viewSizeY
+    if type(viewSize) ==  'table' then 
+        viewSizeX, viewSizeY = table.unpack(viewSize) 
+    else 
+        viewSizeX = viewSize
+        viewSizeY = viewSize 
+    end
+    local pxArea = (viewSizeX * viewSizeY) / (resolutionX * resolutionY)
     local pxSr = pxArea / AstroUnit^2
     local flux = List()
     for f = 1, #frequencies do
         local intens = 0
-        for u = 1, resolution do
-            for v = 1, resolution do
+        for u = 1, resolutionX do
+            for v = 1, resolutionY do
                 local i = idx(u, v)
                 intens = intens + imList[f]['o'][i] + imList[f]['x'][i] + imList[f]['therm'][i]
             end
@@ -48,13 +62,27 @@ local function integrate_flux(imList, idx, resolution, viewSize, frequencies)
 end
 
 local function integrate_flux_mode(mode, imList, idx, resolution, viewSize, frequencies)
-    local pxArea = (viewSize / resolution)^2
+    local resolutionX, resolutionY
+    if type(resolution) ==  'table' then 
+        resolutionX, resolutionY = table.unpack(resolution) 
+    else 
+        resolutionX = resolution
+        resolutionY = resolution 
+    end
+    local viewSizeX, viewSizeY
+    if type(viewSize) ==  'table' then 
+        viewSizeX, viewSizeY = table.unpack(viewSize) 
+    else 
+        viewSizeX = viewSize
+        viewSizeY = viewSize 
+    end
+    local pxArea = (viewSizeX * viewSizeY) / (resolutionX * resolutionY)
     local pxSr = pxArea / AstroUnit^2
     local flux = List()
     for f = 1, #frequencies do
         local intens = 0
-        for u = 1, resolution do
-            for v = 1, resolution do
+        for u = 1, resolutionX do
+            for v = 1, resolutionY do
                 local i = idx(u, v)
                 intens = intens + imList[f][mode][i]
             end
@@ -219,12 +247,35 @@ local function totemission_to_csv(prefix, imList, idx, frequencies, resolution)
     end
 end
 
+local function slice_maps(imList, idx, frequencies, corner, width, height)
+    local res = List {}
+    local smallIdx = function(x, y) return (y - 1) * width + x end
+    for f =  1, #frequencies do
+        local size = (width + 1) * (height + 1)
+        local o = Thyr.DoubleCArray(size)
+        local x = Thyr.DoubleCArray(size)
+        local therm = Thyr.DoubleCArray(size)
+        res:append({o = o, x = x, therm = therm})
+        for u = corner[1], corner[1] + width do
+            for v = corner[2], corner[2] + height do
+                local i = idx(u,v)
+                local j = smallIdx(u - corner[1] + 1, v - corner[2] + 1)
+                o[j] = imList[f]['o'][i]
+                x[j] = imList[f]['x'][i]
+                therm[j] = imList[f]['therm'][i]
+            end
+        end
+    end
+    return res, smallIdx
+end
+
 function main()
     Plyght:init()
     Plyght:start_frame():plot():fig_size(6, 6):end_frame()
-    local prefix = 'c7DataHR'
-    local title = 'High-Res C7 Atmosphere'
-    local bgPrefix = 'c7Data'
+    local prefix = 'c7DataLR'
+    local title = 'Low-Res C7 Atmosphere'
+    -- local bgPrefix = 'c7Data'
+    local bgPrefix = prefix
 
     local resolution = 512
 
@@ -342,13 +393,158 @@ function main()
     end
     plotPol()
 
+
+    local boxWidth = 60
+    local boxHeight = 45
+    local looptopCorner = {130, 300}
+    local footpointCorner = {280, 75}
+    local plot_with_boxes = function(freqIdx)
+        Plyght:start_frame()
+            :plot()
+            :colorbar()
+            :fig_size(6,6)
+            :title(('Total Brightness Temperature at %.2f GHz!!nfor '):format(gyroParams2.frequency[freqIdx] / 1e9) .. title)
+            :imshow(totalMaps[freqIdx], resolution, resolution)
+            :line_style('rx')
+            :line({math.floor(footpointCorner[1] + boxWidth / 2)}, {math.floor(footpointCorner[2] + boxHeight / 2)}, 1)
+            :rectangle(footpointCorner[1], footpointCorner[2], boxWidth, boxHeight, {fill=false, color='r'})
+            :line_style('gx')
+            :line({math.floor(looptopCorner[1] + boxWidth / 2)}, {math.floor(looptopCorner[2] + boxHeight / 2)}, 1)
+            :rectangle(looptopCorner[1], looptopCorner[2], boxWidth, boxHeight, {fill=false, color='g'})
+            :print('TotTb_'..prefix..'_'..freqIdx..'_boxes.png', Dpi)
+            :end_frame()
+    end
+    plot_with_boxes(1)
+
+    local footpointPixels, fpIdx = slice_maps(imageList, idx2, gyroParams2.frequency, footpointCorner, boxWidth, boxHeight)
+    local looptopPixels, ltIdx = slice_maps(imageList, idx2, gyroParams2.frequency, looptopCorner, boxWidth, boxHeight)
+
+    local fullSide = grid3HD2.params.VoxToCm * grid3HD2.params.numVox
+    local fpIntegratedFlux = integrate_flux(footpointPixels, fpIdx, {boxWidth, boxHeight}, {fullSide * boxWidth / resolution, fullSide * boxHeight / resolution}, gyroParams2.frequency)
+    local fpOFlux = integrate_flux_mode('o', footpointPixels, fpIdx, {boxWidth, boxHeight}, {fullSide * boxWidth / resolution, fullSide * boxHeight / resolution}, gyroParams2.frequency)
+    local fpXFlux = integrate_flux_mode('x', footpointPixels, fpIdx, {boxWidth, boxHeight}, {fullSide * boxWidth / resolution, fullSide * boxHeight / resolution}, gyroParams2.frequency)
+    local fpThermFlux = integrate_flux_mode('therm', footpointPixels, fpIdx, {boxWidth, boxHeight}, {fullSide * boxWidth / resolution, fullSide * boxHeight / resolution}, gyroParams2.frequency)
+    local maxFpFlux = 0
+    for k = 1,#fpIntegratedFlux do
+        maxFpFlux = math.max(maxFpFlux, fpIntegratedFlux[k]);
+    end
+
+    local plot_fp_spectrum = function()
+        Plyght:start_frame()
+            :plot()
+            :fig_size(6,4)
+            :x_label('Frequency [Hz]')
+            :y_label('Integrated Flux [sfu]')
+            :title('Footpoint Spectrum')
+            :plot_type('loglog')
+            :line_label('Total Flux')
+            :line(gyroParams2.frequency, fpIntegratedFlux)
+            :line_label('X-mode Flux')
+            :line(gyroParams2.frequency, fpXFlux)
+            :line_label('O-mode Flux')
+            :line(gyroParams2.frequency, fpOFlux)
+            :line_label('Thermal Flux')
+            :line(gyroParams2.frequency, fpThermFlux)
+            :y_range(0.1, 1.1*maxFpFlux)
+            :legend()
+            :print('FootpointFlux_'..prefix..'.png', Dpi)
+            :end_frame()
+    end
+    plot_fp_spectrum()
+
+    local ltIntegratedFlux = integrate_flux(looptopPixels, ltIdx, {boxWidth, boxHeight}, {fullSide * boxWidth / resolution, fullSide * boxHeight / resolution}, gyroParams2.frequency)
+    local ltOFlux = integrate_flux_mode('o', looptopPixels, ltIdx, {boxWidth, boxHeight}, {fullSide * boxWidth / resolution, fullSide * boxHeight / resolution}, gyroParams2.frequency)
+    local ltXFlux = integrate_flux_mode('x', looptopPixels, ltIdx, {boxWidth, boxHeight}, {fullSide * boxWidth / resolution, fullSide * boxHeight / resolution}, gyroParams2.frequency)
+    local ltThermFlux = integrate_flux_mode('therm', looptopPixels, ltIdx, {boxWidth, boxHeight}, {fullSide * boxWidth / resolution, fullSide * boxHeight / resolution}, gyroParams2.frequency)
+    local maxLtFlux = 0
+    for k = 1,#ltIntegratedFlux do
+        maxLtFlux = math.max(maxLtFlux, ltIntegratedFlux[k]);
+    end
+
+    local plot_lt_spectrum = function()
+        Plyght:start_frame()
+            :plot()
+            :fig_size(6,4)
+            :x_label('Frequency [Hz]')
+            :y_label('Integrated Flux [sfu]')
+            :title('Looptop Spectrum')
+            :plot_type('loglog')
+            :line_label('Total Flux')
+            :line(gyroParams2.frequency, ltIntegratedFlux)
+            :line_label('X-mode Flux')
+            :line(gyroParams2.frequency, ltXFlux)
+            :line_label('O-mode Flux')
+            :line(gyroParams2.frequency, ltOFlux)
+            :line_label('Thermal Flux')
+            :line(gyroParams2.frequency, ltThermFlux)
+            :y_range(0.1, 1.1*maxLtFlux)
+            :legend()
+            :print('LooptopFlux_'..prefix..'.png', Dpi)
+            :end_frame()
+    end
+    plot_lt_spectrum()
+
+    local ltPtFlux = List{}
+    local ltPtOFlux = List{}
+    local ltPtXFlux = List{}
+    local ltPtThermFlux = List{}
+    local ltPtIdx = idx2(math.floor(looptopCorner[1] + boxWidth / 2), math.floor(looptopCorner[2] + boxHeight / 2))
+    local pxArea = ((grid3HD2.params.VoxToCm * grid3HD2.params.numVox) / resolution)^2
+    local pxSr = pxArea / AstroUnit^2
+    for f = 1, #gyroParams2.frequency do
+        ltPtOFlux:append(imageList[f]['o'][ltPtIdx] * pxSr)
+        ltPtXFlux:append(imageList[f]['x'][ltPtIdx] * pxSr)
+        ltPtThermFlux:append(imageList[f]['therm'][ltPtIdx] * pxSr)
+        ltPtFlux:append(ltPtOFlux[f] + ltPtXFlux[f] + ltPtThermFlux[f])
+    end
+
+    local fpPtFlux = List{}
+    local fpPtOFlux = List{}
+    local fpPtXFlux = List{}
+    local fpPtThermFlux = List{}
+    local fpPtIdx = idx2(math.floor(footpointCorner[1] + boxWidth / 2), math.floor(footpointCorner[2] + boxHeight / 2))
+    for f = 1, #gyroParams2.frequency do
+        fpPtOFlux:append(imageList[f]['o'][fpPtIdx] * pxSr)
+        fpPtXFlux:append(imageList[f]['x'][fpPtIdx] * pxSr)
+        fpPtThermFlux:append(imageList[f]['therm'][fpPtIdx] * pxSr)
+        fpPtFlux:append(fpPtOFlux[f] + fpPtXFlux[f] + fpPtThermFlux[f])
+    end
+
+    local plot_pt_spectrum = function(title, tot, o, x, therm)
+        local maxFlux = 0
+        local minFlux = 1
+        for k = 1,#tot do
+            maxFlux = math.max(maxFlux, tot[k]);
+            minFlux = math.min(minFlux, tot[k]);
+        end
+        Plyght:start_frame()
+            :plot()
+            :fig_size(6,4)
+            :x_label('Frequency [Hz]')
+            :y_label('Integrated Flux [sfu]')
+            :title(title..' Point Flux')
+            :plot_type('loglog')
+            :line_label('Total Flux')
+            :line(gyroParams2.frequency, tot)
+            :line_label('X-mode Flux')
+            :line(gyroParams2.frequency, x)
+            :line_label('O-mode Flux')
+            :line(gyroParams2.frequency, o)
+            :line_label('Thermal Flux')
+            :line(gyroParams2.frequency, therm)
+            :y_range(0.1*minFlux, 1.1*maxFlux)
+            :legend()
+            :print(title..'PointFlux_'..prefix..'.png', Dpi)
+            :end_frame()
+    end
+    plot_pt_spectrum('Looptop', ltPtFlux, ltPtOFlux, ltPtXFlux, ltPtThermFlux)
+    plot_pt_spectrum('Footpoint', fpPtFlux, fpPtOFlux, fpPtXFlux, fpPtThermFlux)
+
     totemission_to_csv(prefix, imageList, idx2, gyroParams2.frequency, resolution)
     component_maps_to_csv(prefix, imageList, idx2, gyroParams2.frequency, resolution)
     map_to_csv(prefix..'_pol', polMaps, idx2, gyroParams2.frequency, resolution)
 
-    return plotPol
-
 
 end
 
-plot = main()
+main()

@@ -1048,6 +1048,38 @@ local function ray_direction(rotMat)
     return (rotMat * maf.vec3(0.0, 0.0, 1.0):normalize()):normalize()
 end
 
+local function gyro_sim()
+    local gyroIn = GyroIn()
+    local delta = torch.Tensor{3}
+    gyroIn.delta = delta:data()
+    gyroIn.deltaLen = delta:size(1)
+
+    local energy = torch.Tensor{10, 5e3}
+    gyroIn.energy = energy:data()
+    gyroIn.energyLen = energy:size(1)
+
+    local frequency = torch.Tensor(List.range(1,400):transform(function (v) return v * 1e9 / 4 end))
+    gyroIn.frequency = frequency:data()
+    gyroIn.frequencyLen = frequency:size(1)
+
+    gyroIn.bMag = 800
+    gyroIn.angle = 45 
+
+    gyroIn.nel = 1e8
+    gyroIn.np = 1e10
+    local thermalData = ThermalRadiationData()
+    thermalData.temperature = 1e5
+    thermalData.protonDensity = 1 
+    thermalData.neutralHDensity = 1 
+    local data = Gyro.GyroSimulateC(gyroIn, thermalData)
+    local result = List()
+    for i = 0, frequency:size(1)-1 do
+        result:append({data.jo[i] + data.jx[i], data.ko[i] + data.kx[i]} )
+    end
+    return result
+
+end
+
 --- Axis Aligned Bounding Box.
 -- @table AABB
 -- @tfield MinMax x
@@ -1075,4 +1107,5 @@ return { solar_location = solar_location,
          restore_backup_grid = restore_backup_grid,
          DoubleCArray = DoubleCArray,
          ArcToCm = ArcToCm,
+         gyro_sim = gyro_sim
 }
