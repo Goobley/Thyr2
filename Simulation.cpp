@@ -5,10 +5,10 @@
 #include <algorithm>
 #include <cmath>
 #include <cassert>
-#include "gauss_legendre.c"
 #include <cstdio>
 #include <xmmintrin.h>
 #include <future>
+#include "GaussLegendreTable.ixx"
 
 // To enable floating point exception trapping
 // _MM_SET_EXCEPTION_MASK(_MM_GET_EXCEPTION_MASK() & ~_MM_MASK_INVALID);
@@ -133,17 +133,33 @@ static f64 Pow(f64 x, f64 y)
 //     return val;
 // #endif
 
+namespace GaussLegendre
+{
+    void Scale20(f64 a, f64 b, f64* xScale, f64* wScale)
+    {
+        const int n = 20;
+        const f64 mid = 0.5 * (a + b);
+        const f64 halfWidth = 0.5 * (b - a);
+
+        for (int i = 0; i < n; ++i)
+        {
+            xScale[i] = mid + halfWidth * x[i];
+            wScale[i] = halfWidth * w[i];
+        }
+    }
+}
+
 namespace Bessel
 {
     f64 Bessj0(f64 x)
     {
-        f64 p[5] = {1.e0,-0.1098628627e-2,0.2734510407e-4,
+        constexpr f64 p[5] = {1.e0,-0.1098628627e-2,0.2734510407e-4,
                     -0.2073370639e-5,0.2093887211e-6};
-        f64 q[5] = {-0.1562499995e-1,
+        constexpr f64 q[5] = {-0.1562499995e-1,
                     0.1430488765e-3,-0.6911147651e-5,0.7621095161e-6,-0.934945152e-7};
-        f64 r[6] = {57568490574.0e0,-13362590354.e0,651619640.7e0,
+        constexpr f64 r[6] = {57568490574.0e0,-13362590354.e0,651619640.7e0,
                     -11214424.18e0,77392.33017e0,-184.9052456e0};
-        f64 s[6] = {57568490411.e0,1029532985.0e0,
+        constexpr f64 s[6] = {57568490411.e0,1029532985.0e0,
                     9494680.718e0,59272.64853e0,267.8532712e0,1.0e0};
 
         if (std::abs(x) < 8.0)
@@ -164,13 +180,13 @@ namespace Bessel
 
     f64 Bessj1(f64 x)
     {
-        double r[6] = {72362614232.0e0,-7895059235.0e0,242396853.1e0,
+        constexpr f64 r[6] = {72362614232.0e0,-7895059235.0e0,242396853.1e0,
                        -2972611.439e0,15704.48260e0,-30.16036606e0};
-        double s[6] = {144725228442.0e0,2300535178.0e0,
+        constexpr f64 s[6] = {144725228442.0e0,2300535178.0e0,
                        18583304.74e0,99447.43394e0,376.9991397e0,1.0e0};
-        double p[5] = {1.e0,0.183105e-2,-0.3516396496e-4,0.2457520174e-5,
+        constexpr f64 p[5] = {1.e0,0.183105e-2,-0.3516396496e-4,0.2457520174e-5,
                        -0.240337019e-6};
-        double q[5] = {.04687499995e0,-0.2002690873e-3,
+        constexpr f64 q[5] = {.04687499995e0,-0.2002690873e-3,
                        0.8449199096e-5,-0.88228987e-6,0.105787412e-6};
 
         if (std::abs(x) < 8.0)
@@ -191,9 +207,9 @@ namespace Bessel
 
     f64 Bessj(uint n, f64 x)
     {
-        const int iacc = 40;
-        const double bigno = 1.0e10;
-        const double bigni = 1.0e-10;
+        constexpr int iacc = 40;
+        constexpr f64 bigno = 1.0e10;
+        constexpr f64 bigni = 1.0e-10;
 
         f64 tox = 2.0 / x;
 
@@ -312,6 +328,8 @@ namespace Bessel
                 printf("s = %d", s);
                 assert(false);
             }
+            // Should probably just use the standard library implementation here
+            // It's slower, but more accurate, but, at the end of the day, it shouldn't be called often
             if (x > upper) return Bessel(s, x);
 
             return vals[s][std::floor(step*x)];
@@ -530,8 +548,9 @@ std::pair<f64,f64> GyroCore(const CoreConstants& core, const CoreVariables& v, c
         f64 weight[C::NPTS];
         // f64 gamma2[C::NPTS];
         // f64 weight2[C::NPTS];
-	    scale_gauss_legendre_table(lowerG, higherG, gamma, weight); 
+	    // scale_gauss_legendre_table(lowerG, higherG, gamma, weight); 
         // GaussQuadrature(lowerG, higherG, gamma2, weight2, C::NPTS);
+        GaussLegendre::Scale20(lowerG, higherG, gamma, weight);
 
         // Loop through the gamma points
         for (int i = 0; i < C::NPTS; ++i)
