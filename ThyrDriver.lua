@@ -164,7 +164,7 @@ function main()
     Plyght:init()
     -- Load in atmospheric model
     local atmosData = c7Data
-    local prefix = 'c7Data'
+    local prefix = 'c7DataHR'
     -- Compute non-thermal electron drop off with increasing density
     nel_stopping_array(atmosData)
     -- Produce a plot of the atmosphere if Plyght is running
@@ -210,7 +210,7 @@ function main()
     print(("Height in km: %f, \": %f"):format(height * VoxToCm / 1e5, height * VoxToCm / Thyr.ArcToCm ))
 
     -- Make basic dipole shape
-    local resolution = 1024
+    local resolution = 512
     local trans = maf.vec3(0, 0, 0)
     print('Making Basic Dipole: ', os.time() - startTime)
     local grid3, idx, aabb, count = Thyr.dipole(dipoleParams, trans)
@@ -251,8 +251,8 @@ function main()
                       end
     print('Making Accurate Dipole: ', os.time() - startTime)
     -- Create the rotation quaternion for the object (effectively just a fancy form of a rotation matrix)
-    -- local rotMat = Thyr.solar_location(0, -20, 30, 70)
-    local rotMat = Thyr.solar_location(0, 0, 90, 0)
+    local rotMat = Thyr.solar_location(0, -20, 30, 70)
+    -- local rotMat = Thyr.solar_location(0, 0, 90, 0)
     -- Deduce the unit direction vector of our parallel rays from the quaternion
     local rayDir = Thyr.ray_direction(rotMat)
 
@@ -267,7 +267,8 @@ function main()
                         rotMat = rotMat,
                     }
     -- Parameters needed for the simulation of GS emission
-    local gyroParams = { frequency = { 1e9, 2e9, 3.75e9, 9.4e9, 17e9, 35e9, 80e9, 110e9, 250e9 } }
+    local gyroParams = { frequency = { 1e9, 1.26e9, 1.59e9, 2e9, 2.47e9, 3.04e9, 3.75e9, 5.09e9, 6.92e9, 9.4e9, 11.5e9, 14.0e9, 
+                                       17e9, 21.6e9, 27.5e9, 35e9, 52.9e9, 80e9, 110e9, 166e9, 250e9 } }
     local plot
 
     if true then

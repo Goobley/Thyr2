@@ -20,6 +20,8 @@ local function compute_total_emission_maps(imList, idx, frequencies, resolution)
             for v = 1, resolution do
                 local i = idx(u, v)
                 totalMaps[f][i] = imList[f]['o'][i] + imList[f]['x'][i] + imList[f]['therm'][i]
+                -- This is a questionable hack to make the background white!
+                if totalMaps[f][i] == 0 then totalMaps[f][i] = math.huge/math.huge end
             end
         end
     end
@@ -272,8 +274,8 @@ end
 function main()
     Plyght:init()
     Plyght:start_frame():plot():fig_size(6, 6):end_frame()
-    local prefix = 'c7DataLR'
-    local title = 'Low-Res C7 Atmosphere'
+    local prefix = 'c7DataHR'
+    local title = 'High-Res C7 Atmosphere'
     -- local bgPrefix = 'c7Data'
     local bgPrefix = prefix
 
@@ -393,11 +395,20 @@ function main()
     end
     plotPol()
 
-
     local boxWidth = 60
     local boxHeight = 45
     local looptopCorner = {130, 300}
     local footpointCorner = {280, 75}
+    local fpPoints = List {}
+
+    -- fpPoints:append({292, 110, 'k'})
+    fpPoints:append({295, 107, 'b'})
+    -- fpPoints:append({math.floor(footpointCorner[1] + boxWidth / 2), math.floor(footpointCorner[2] + boxHeight / 2), 'r'})
+    fpPoints:append({307, 99, 'r'})
+    fpPoints:append({320, 90, 'y'})
+    fpPoints:append({323, 88, 'k'})
+    fpPoints:append({327, 86, 'c'})
+
     local plot_with_boxes = function(freqIdx)
         Plyght:start_frame()
             :plot()
@@ -405,8 +416,10 @@ function main()
             :fig_size(6,6)
             :title(('Total Brightness Temperature at %.2f GHz!!nfor '):format(gyroParams2.frequency[freqIdx] / 1e9) .. title)
             :imshow(totalMaps[freqIdx], resolution, resolution)
-            :line_style('rx')
-            :line({math.floor(footpointCorner[1] + boxWidth / 2)}, {math.floor(footpointCorner[2] + boxHeight / 2)}, 1)
+            for i = 1, #fpPoints do
+                Plyght:line_style(fpPoints[i][3]..'x'):line({fpPoints[i][1]}, {fpPoints[i][2]}, 1)
+            end
+        Plyght
             :rectangle(footpointCorner[1], footpointCorner[2], boxWidth, boxHeight, {fill=false, color='r'})
             :line_style('gx')
             :line({math.floor(looptopCorner[1] + boxWidth / 2)}, {math.floor(looptopCorner[2] + boxHeight / 2)}, 1)
@@ -414,7 +427,10 @@ function main()
             :print('TotTb_'..prefix..'_'..freqIdx..'_boxes.png', Dpi)
             :end_frame()
     end
-    plot_with_boxes(1)
+    -- plot_with_boxes(2)
+    for i = 1, #gyroParams2.frequency do
+        plot_with_boxes(i)
+    end
 
     local footpointPixels, fpIdx = slice_maps(imageList, idx2, gyroParams2.frequency, footpointCorner, boxWidth, boxHeight)
     local looptopPixels, ltIdx = slice_maps(imageList, idx2, gyroParams2.frequency, looptopCorner, boxWidth, boxHeight)
@@ -498,17 +514,17 @@ function main()
         ltPtFlux:append(ltPtOFlux[f] + ltPtXFlux[f] + ltPtThermFlux[f])
     end
 
-    local fpPtFlux = List{}
-    local fpPtOFlux = List{}
-    local fpPtXFlux = List{}
-    local fpPtThermFlux = List{}
-    local fpPtIdx = idx2(math.floor(footpointCorner[1] + boxWidth / 2), math.floor(footpointCorner[2] + boxHeight / 2))
-    for f = 1, #gyroParams2.frequency do
-        fpPtOFlux:append(imageList[f]['o'][fpPtIdx] * pxSr)
-        fpPtXFlux:append(imageList[f]['x'][fpPtIdx] * pxSr)
-        fpPtThermFlux:append(imageList[f]['therm'][fpPtIdx] * pxSr)
-        fpPtFlux:append(fpPtOFlux[f] + fpPtXFlux[f] + fpPtThermFlux[f])
-    end
+    -- local fpPtFlux = List{}
+    -- local fpPtOFlux = List{}
+    -- local fpPtXFlux = List{}
+    -- local fpPtThermFlux = List{}
+    -- local fpPtIdx = idx2(math.floor(footpointCorner[1] + boxWidth / 2), math.floor(footpointCorner[2] + boxHeight / 2))
+    -- for f = 1, #gyroParams2.frequency do
+    --     fpPtOFlux:append(imageList[f]['o'][fpPtIdx] * pxSr)
+    --     fpPtXFlux:append(imageList[f]['x'][fpPtIdx] * pxSr)
+    --     fpPtThermFlux:append(imageList[f]['therm'][fpPtIdx] * pxSr)
+    --     fpPtFlux:append(fpPtOFlux[f] + fpPtXFlux[f] + fpPtThermFlux[f])
+    -- end
 
     local plot_pt_spectrum = function(title, tot, o, x, therm)
         local maxFlux = 0
@@ -522,7 +538,7 @@ function main()
             :fig_size(6,4)
             :x_label('Frequency [Hz]')
             :y_label('Integrated Flux [sfu]')
-            :title(title..' Point Flux')
+            :title(title..' Pixel Flux')
             :plot_type('loglog')
             :line_label('Total Flux')
             :line(gyroParams2.frequency, tot)
@@ -538,7 +554,41 @@ function main()
             :end_frame()
     end
     plot_pt_spectrum('Looptop', ltPtFlux, ltPtOFlux, ltPtXFlux, ltPtThermFlux)
-    plot_pt_spectrum('Footpoint', fpPtFlux, fpPtOFlux, fpPtXFlux, fpPtThermFlux)
+
+    local fpFluxes = List{}
+    for i = 1, #fpPoints do
+        local flux = List{}
+        local ptIdx = idx2(fpPoints[i][1], fpPoints[i][2])
+        fpFluxes:append(flux)
+        for f =  1, #gyroParams2.frequency do
+            flux:append((imageList[f]['o'][ptIdx] + imageList[f]['x'][ptIdx] + imageList[f]['therm'][ptIdx]) * pxSr)
+        end
+    end
+    local plot_footpoint_spectra = function(fluxes)
+        local maxFlux = 0
+        local minFlux = 1
+        for f = 1, #fluxes do
+            for k = 1,#fluxes[f] do
+                maxFlux = math.max(maxFlux, fluxes[f][k]);
+                minFlux = math.min(minFlux, fluxes[f][k]);
+            end
+        end
+        Plyght:start_frame()
+            :plot()
+            :fig_size(6,4)
+            :x_label('Frequency [Hz]')
+            :y_label('Integrated Flux [sfu]')
+            :title(title..' Pixel Fluxes')
+            :plot_type('loglog')
+        for f = 1, #fluxes do
+            Plyght:line_style(fpPoints[f][3]):line(gyroParams2.frequency, fluxes[f])
+        end
+        Plyght
+            :y_range(0.1*minFlux, 1.1*maxFlux)
+            :print('FootpointPointFlux_'..prefix..'.png', Dpi)
+            :end_frame()
+    end
+    plot_footpoint_spectra(fpFluxes)
 
     totemission_to_csv(prefix, imageList, idx2, gyroParams2.frequency, resolution)
     component_maps_to_csv(prefix, imageList, idx2, gyroParams2.frequency, resolution)

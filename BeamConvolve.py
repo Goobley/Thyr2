@@ -23,7 +23,7 @@ frequency = [
     250000000000
 ]
 
-prefix = 'c7DataHR_pol'
+prefix = 'c7DataHR_tot'
 title = 'C7 Atmosphere High-Res'
 numVox = 32
 VoxToCm = 181317735.10211
@@ -32,6 +32,7 @@ files = [x for x in os.listdir() if x.endswith('.csv') and x.startswith(prefix)]
 indices = [int(re.match(prefix+'_(.*?).csv', x).group(1)) for x in files]
 files = [x for _,x in sorted(zip(indices, files))]
 
+# plt.gcf().set_size_inches(6,6)
 for i in range(len(files)):
     mat = np.genfromtxt(files[i], delimiter=',').T
     beamSize = 0
@@ -46,9 +47,13 @@ for i in range(len(files)):
     pxArcSec = fovArcSec / mat.shape[0]
     kernelSize = beamSize / pxArcSec
     conv = gaussian_filter(mat, kernelSize, mode='constant', cval=0.0)
-    plt.figure(figsize=(10,8))
+    plt.figure(figsize=(6,6))
+    # plt.clf()
     plt.imshow(conv, origin='bottom left', extent=[0, 1, 0, 1], cmap='plasma')
-    plt.title("Total Brightess Temperature at %.2f GHz (%.1f' beam, %s)" % (frequency[i] / 1e9, beamSize, title))
+    titlePrefix = "Total Brightness Temperature"
+    if prefix.endswith('pol'):
+        titlePrefix = "Polarisation Fraction"
+    plt.title(titlePrefix + " at %.2f GHz\n(%.1f\" beam, %s)" % (frequency[i] / 1e9, beamSize, title))
     locs, labels = plt.xticks()
     labels = ['%.0f' % x for x in np.linspace(0, fovArcSec, num=len(locs))]
     plt.xticks(locs, labels)
@@ -60,6 +65,6 @@ for i in range(len(files)):
     filename = 'TotTbConv_'
     if prefix.endswith('pol'):
         filename = 'PolConv_'
-    plt.savefig(filename+prefix+'_'+str(i)+'.png')
+    plt.savefig(filename+prefix+'_'+str(i+1)+'.png', dpi=300)
     # plt.show()
 

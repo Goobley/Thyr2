@@ -67,16 +67,14 @@ function FindClosestData(height, data)
                     np = data.np[i],
                     HI = data.HI[i],
                     HII = data.HII[i],
-                    HMinus = data.HMinus[i],
-                    nel = data.nel[i]}
+                    HMinus = data.HMinus[i]}
          else
             return {height = data.height[i-1],
                     temperature = data.temperature[i-1],
                     np = data.np[i-1],
                     HI = data.HI[i-1],
                     HII = data.HII[i-1],
-                    HMinus = data.HMinus[i-1],
-                    nel = data.nel[i-1]}
+                    HMinus = data.HMinus[i-1]}
          end
       end
    end
@@ -95,8 +93,7 @@ function interpolate_data(height, data)
                  np = Lerp({data.np[i-1], data.np[i]}),
                  HI = Lerp({data.HI[i-1], data.HI[i]}),
                  HII = Lerp({data.HII[i-1], data.HII[i]}),
-                 HMinus = Lerp({data.HMinus[i-1], data.HMinus[i]}),
-                 nel = Lerp({data.nel[i-1], data.nel[i]})}
+                 HMinus = Lerp({data.HMinus[i-1], data.HMinus[i]})}
       end
    end
 
@@ -107,23 +104,15 @@ function interpolate_data(height, data)
               np = data.np[#h],
               HI = data.HI[#h],
               HII = data.HII[#h],
-              HMinus = data.HMinus[#h],
-              nel = data.nel[#h]}
+              HMinus = data.HMinus[#h]}
    else
       return {height = height,
               temperature = data.temperature[1],
               np = data.np[1],
               HI = data.HI[1],
               HII = data.HII[1],
-              HMinus = data.HMinus[1],
-              nel = data.nel[1]}
+              HMinus = data.HMinus[1]}
    end
    -- in case something goes wrong
    return nil
-end
-
-function MapPairs(list, func)
-   for u, v in pairs(list) do
-      func(u, v)
-   end
 end
