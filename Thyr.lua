@@ -322,6 +322,8 @@ local function visualise_dipole_param(d, scale, gyroParams, paramName, interp_fn
                     -- local surfaceY = (-b + math.sqrt(Delta)) / 2
 
                     -- We already have a depth parameter... Duh
+                    -- This should works when the curvature of the Sun is small compared to the distance separating the footpoints
+                    -- Which is problematic for the Klein loop
                     local h = (y - p.depth + d.trans.y) * p.VoxToCm
                     -- local h = (y - surfaceY) * p.VoxToCm
                     local xx = math.floor(scale * x - scale * d.aabb.x.min + scale * d.trans.x)
@@ -371,7 +373,7 @@ local function visualise_dipole_param(d, scale, gyroParams, paramName, interp_fn
                     then
                         local param = {
                                        ['angle'] = gyroIn.angle,
-                                       ['height'] = h,
+                                       ['height'] = data.height,
                                        ['N_el'] = gyroIn.nel,
                                        ['N_p'] = gyroIn.np,
                                        ['B_mag'] = gyroIn.bMag,

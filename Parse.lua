@@ -35,7 +35,7 @@ function parse_atmos_data(filename)
    data.HMinus = {}
 
    -- read file and file table
-   local f = assert(io.open(filename), 'r')
+   local f = assert(io.open(filename, 'r'))
    -- ignore first line with headers
    f:read('*line')
    while true do
@@ -55,6 +55,21 @@ function parse_atmos_data(filename)
    -- data.LerpExtract = function()
 
    return data
+end
+
+function parse_two_col_csv(filename)
+    local xs, ys = {}, {}
+
+    local f = assert(io.open(filename, 'r'))
+    while true do
+        local line = f:read('*line')
+        if line == nil then break end
+        local csv = ParseCSVLine(line)
+        xs[#xs+1] = csv[1]
+        ys[#ys+1] = csv[2]
+    end
+    f:close()
+    return xs, ys
 end
 
 function FindClosestData(height, data)

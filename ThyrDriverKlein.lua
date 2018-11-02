@@ -1,8 +1,10 @@
 assert(loadfile('Parse.lua'))()
 local List = require('pl.List')
+local stringx = require('pl.stringx')
+stringx.import()
 local Thyr = require('Thyr')
 local maf = require('maf')
-local Plyght = require('Plyght')
+local Plyght = require('Plyght.Plyght')
 local f1Data = parse_atmos_data('f1_adj.csv')
 local c7Data = parse_atmos_data('c7_adj.csv')
 
@@ -146,28 +148,30 @@ function main()
     local startTime = os.time()
     Plyght:init()
     local atmosData = f1Data
-    -- local prefix = 'Klein'
-    local prefix = 'Klein30'
-    -- local prefix = 'Klein50'
+    -- local prefix = 'KleinM5pc'
+    -- local prefix = 'Klein30'
+    local prefix = 'Klein50P5pc'
     nel_stopping_array(atmosData)
     plot_atmos_data(atmosData, prefix)
 
-    local numVox = 512
+    local numVox = 256
     -- local gridSide = 80 * Thyr.ArcToCm
-    local height = numVox / 1.5
+    -- local height = numVox / 1.5
     local gridSide = (2e10 * 1.5)  * 2
     local VoxToCm = gridSide / numVox
+    local height = 1.9e10 / VoxToCm + (numVox / 3)
     local dipoleParams = 
     {
         numVox = numVox,
         height = height,
-        depth = numVox / 3,
+        depth = numVox / 2.86,
         -- phi0 = math.pi / 8,
         phi0 = 0,
         -- rho0 = height / 5,
         rho0 = 0.1e10 / VoxToCm,
         gridSide = gridSide,
-        b0Mag = 3,
+        b0Mag = 3.21 * 1.05,
+        -- b0Mag = 3.3,
         VoxToCm = VoxToCm,
     }
     print(("Voxel in km: %f, \": %f"):format(VoxToCm / 1e5, VoxToCm / Thyr.ArcToCm ))
@@ -182,28 +186,39 @@ function main()
 
         local scale  =  1
         -- local interp_fn = function(height) return interpolate_data(height, atmosData) end
+        -- The Klein loop is large compared to the curvature of the Sun, so the
+        -- footpoints end up at a noticeably negative altitude compared to the
+        -- altitude of the surface. For sensible loops like we have the ability
+        -- to observe in Solar Physics these days, this locally planar
+        -- assumption is fine. Here however, it isn't. So let's apply a fudge
+        -- factor to compensate.
         local interp_fn = function(height) 
+            height = height + 1.52e9
             local n0 = 1e7
-            local n = n0 * math.exp((2e10 - height) / (((height / Thyr.ArcToCm + 960) / 960)^2 * 1e10))
+            -- local n = n0 * math.exp((1.95e10 - height) / (((height / Thyr.ArcToCm + 960) / 960)^2 * 1.19e10))
+            local n = n0 * math.exp((2e10 - height) / (((height / Thyr.ArcToCm + 960) / 960)^2 * 1.02e10))
             return {height = height,
                     temperature = 1,
                     np = n,
                     HI = 1,
                     HII = 1,
                     HMinus = 1,
-                    nel = 1e4, }
+                    nel = 1e4,
+                    beamDelta = delta,
+                    beamEnergyLimits = energyLimits }
         end
         print('Making Accurate Dipole: ', os.time() - startTime)
         -- local rotMat = rotation_zyx(math.pi/4, 0, 0):mul(rotation_zyx(math.pi/2, 0, 0):mul(rotation_zyx(0, 0, math.pi/2)))
         -- local rotMat = Thyr.solar_location(0, -20, 30, 70)
         local rotMat
-        if prefix == 'Klein50' then
+        if prefix:startswith('Klein50') then
             rotMat = Thyr.solar_location(0, 90, 0, 50)
-        elseif prefix == 'Klein30' then
+        elseif prefix:startswith('Klein30') then
             rotMat = Thyr.solar_location(0, 90, 0, 30)
         else
             rotMat = Thyr.solar_location(0, 90, 0, 0)
         end
+        -- rotMat = Thyr.solar_location(90, 0, 0, 0)
         local rayDir = Thyr.ray_direction(rotMat)
 
         local dipoleData = {grid = grid3, 
@@ -220,22 +235,28 @@ function main()
                                           energy = energyLimits, delta = delta }
         -- local grid3HD = Thyr.visualise_dipole_param(dipoleData, scale, gyroParams, 'N_p', interp_fn)
 
-        local grid3HD = Thyr.dipole_in_aabb(dipoleData, scale, gyroParams, interp_fn)
+        local gyroThreads = 4
+        local gyroFile = io.open('CoreCount', 'r')
+        if gyroFile ~= nil then gyroThreads = gyroFile:read('*n') gyroFile:close() end
+
+
+        local pool = Thyr.create_gyro_thread_pool(gyroThreads)
+        local grid3HD = Thyr.dipole_in_aabb(dipoleData, scale, gyroParams, interp_fn, pool)
         -- print('Making High-Res Footpoints: ', os.time() - startTime)
         -- local highResRegions = Thyr.create_high_res_footpoints(dipoleData, gyroParams, 8, 0.25, interp_fn)
     -- end
 
 
     Thyr.backup_grid(grid3HD, gyroParams, prefix..'/base')
-    -- Thyr.backup_grid(highResRegions[1], gyroParams, prefix..'/hr1')
-    -- Thyr.backup_grid(highResRegions[2], gyroParams, prefix..'/hr2')
+    -- -- Thyr.backup_grid(highResRegions[1], gyroParams, prefix..'/hr1')
+    -- -- Thyr.backup_grid(highResRegions[2], gyroParams, prefix..'/hr2')
 
     local grid3HD2, gyroParams2 = Thyr.restore_backup_grid(prefix..'/base')
-    -- local hr1, _ = Thyr.restore_backup_grid(prefix..'/hr1')
-    -- local hr2, _ = Thyr.restore_backup_grid(prefix..'/hr2')
-    -- local highRes = List {hr1, hr2}
+    -- -- local hr1, _ = Thyr.restore_backup_grid(prefix..'/hr1')
+    -- -- local hr2, _ = Thyr.restore_backup_grid(prefix..'/hr2')
+    -- -- local highRes = List {hr1, hr2}
     local highRes = List{}
-    -- local highRes = highResRegions
+    -- -- local highRes = highResRegions
 
     print('Path Tracing: ', os.time() - startTime)
 
@@ -264,7 +285,7 @@ function main()
     -- end
     -- plot()
 
-    return plot
+    -- return plot
     -- Plyght:close()
 
 end

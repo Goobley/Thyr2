@@ -402,12 +402,12 @@ function main()
     local fpPoints = List {}
 
     -- fpPoints:append({292, 110, 'k'})
-    fpPoints:append({295, 107, 'b'})
     -- fpPoints:append({math.floor(footpointCorner[1] + boxWidth / 2), math.floor(footpointCorner[2] + boxHeight / 2), 'r'})
-    fpPoints:append({307, 99, 'r'})
-    fpPoints:append({320, 90, 'y'})
-    fpPoints:append({323, 88, 'k'})
-    fpPoints:append({327, 86, 'c'})
+    fpPoints:append({295, 107, {color='#0077BB', marker='X', markeredgecolor='k', markersize=8}, {color='#0077BB'}}) -- blue
+    fpPoints:append({307, 99, {color='#CC3311', marker='X', markeredgecolor='k', markersize=8}, {color='#CC3311'}}) -- red
+    fpPoints:append({320, 90, {color='#EE7733', marker='X', markeredgecolor='k', markersize=8}, {color='#EE7733'}}) -- orange
+    fpPoints:append({323, 88, {color='#BBBBBB', marker='X', markeredgecolor='k', markersize=8}, {color='#BBBBBB'}}) -- grey
+    fpPoints:append({327, 86, {color='#009988', marker='X', markeredgecolor='k', markersize=8}, {color='#009988'}}) -- teal
 
     local plot_with_boxes = function(freqIdx)
         Plyght:start_frame()
@@ -417,13 +417,19 @@ function main()
             :title(('Total Brightness Temperature at %.2f GHz!!nfor '):format(gyroParams2.frequency[freqIdx] / 1e9) .. title)
             :imshow(totalMaps[freqIdx], resolution, resolution)
             for i = 1, #fpPoints do
-                Plyght:line_style(fpPoints[i][3]..'x'):line({fpPoints[i][1]}, {fpPoints[i][2]}, 1)
+                if type(fpPoints[i][3]) == 'string' then
+                    Plyght:line_style(fpPoints[i][3]..'x'):line({fpPoints[i][1]}, {fpPoints[i][2]}, 1)
+                else
+                    Plyght:line_style(fpPoints[i][3]):line({fpPoints[i][1]}, {fpPoints[i][2]}, 1)
+                end
             end
         Plyght
-            :rectangle(footpointCorner[1], footpointCorner[2], boxWidth, boxHeight, {fill=false, color='r'})
-            :line_style('gx')
+            :rectangle(footpointCorner[1], footpointCorner[2], boxWidth, boxHeight, {fill=false, color='k', linewidth=2})
+            :rectangle(footpointCorner[1], footpointCorner[2], boxWidth, boxHeight, {fill=false, color='#CC3311'})
+            :line_style(fpPoints[#fpPoints][3])
             :line({math.floor(looptopCorner[1] + boxWidth / 2)}, {math.floor(looptopCorner[2] + boxHeight / 2)}, 1)
-            :rectangle(looptopCorner[1], looptopCorner[2], boxWidth, boxHeight, {fill=false, color='g'})
+            :rectangle(looptopCorner[1], looptopCorner[2], boxWidth, boxHeight, {fill=false, color='k', linewidth=2})
+            :rectangle(looptopCorner[1], looptopCorner[2], boxWidth, boxHeight, {fill=false, color='#009988'})
             :print('TotTb_'..prefix..'_'..freqIdx..'_boxes.png', Dpi)
             :end_frame()
     end
@@ -581,7 +587,7 @@ function main()
             :title(title..' Pixel Fluxes')
             :plot_type('loglog')
         for f = 1, #fluxes do
-            Plyght:line_style(fpPoints[f][3]):line(gyroParams2.frequency, fluxes[f])
+            Plyght:line_style(fpPoints[f][4]):line(gyroParams2.frequency, fluxes[f])
         end
         Plyght
             :y_range(0.1*minFlux, 1.1*maxFlux)
