@@ -15,6 +15,6 @@ Running Thyr:
 - Post-processing of the simulations from the backed up "datacubes" is done using `th ThyrPostProcess.lua`.
   Set `prefix` in `ThyrPostProcess.lua` to the same string as was used in `ThyrDriver.lua`.
 
-**NB: The default simulation in ThyrDriver.lua is currently very high resolution and will take a long time to compute. To get quick results from Thyr I would recommend `numVox = 32` with a refinement factor of 2 in `Thyr.create_high_res_footpoints`. To obtain results quickly it is also a good idea to reduce the number of frequencies being computed, especially the higher frequencies.
+**NB: The default simulation in ThyrDriver.lua is currently very high resolution and will take a long time to compute. To get quick results from Thyr I would recommend `numVox = 32` with a refinement factor of 2 in `Thyr.create_high_res_footpoints`. To obtain results quickly it is also a good idea to reduce the number of frequencies being computed, especially the higher frequencies**.
 
 All files under [MIT License](https://opensource.org/licenses/MIT) (c) 2015-2018 Christopher Osborne, University of Glasgow, with the exception of `maf.lua` (c) Bjorn Swenson (MIT License) and the excellent [Penlight](http://stevedonovan.github.com/Penlight) libraries (c) Steve Donovan (MIT License).
